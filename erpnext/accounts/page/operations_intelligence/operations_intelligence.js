@@ -85,7 +85,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			} else if (char === "," && !quoted) {
 				row.push(field); field = "";
 			} else if ((char === "\n" || char === "\r") && !quoted) {
-				if (char === "\r" && text[i + 1] === "\\n") i++;
+				if (char === "\r" && text[i + 1] === "\n") i++;
 				row.push(field); field = "";
 				if (row.some((value) => String(value).trim() !== "")) records.push(row);
 				row = [];
@@ -129,6 +129,10 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 					const file = dialog.$wrapper.find("input[name='inventory_csv']")[0]?.files?.[0];
 					if (!file) {
 						frappe.msgprint(__("Choose an inventory CSV file first."));
+						return;
+					}
+					if (file.size > 5 * 1024 * 1024) {
+						frappe.msgprint(__("CSV files must be 5 MB or smaller. Split the inventory into smaller batches."));
 						return;
 					}
 					const reader = new FileReader();
