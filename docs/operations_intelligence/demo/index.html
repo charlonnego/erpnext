@@ -18,12 +18,14 @@ main{width:min(760px,100%);border:1px solid var(--line);border-radius:24px;backg
 <header class="brand"><div class="mark">J&amp;D</div><div><strong>Joe&amp;dave</strong><small>Operations Intelligence</small></div></header>
 <div class="eyebrow">Live operational engine</div>
 <h1>Decisions from your records.<br><span style="color:var(--green)">Never invented numbers.</span></h1>
-<p>The engine is being built into the Joe&amp;dave ERPNext application. It calculates financial KPIs, overdue invoice alerts and stock reorder signals from records your signed-in ERPNext user is permitted to see.</p>
-<section class="status" role="status"><span class="dot"></span><div><strong>ERPNext connection required</strong><p>This Pages address is static hosting and is not connected to an authenticated ERPNext site or its database. No figures are displayed here. Open the Operations Intelligence page inside your deployed ERPNext site to use the live engine.</p></div></section>
+<p>The Joe&amp;dave feature branch now includes live-data insight rules, native ERPNext invoice/payment entry shortcuts, and a validated inventory CSV workflow that creates draft Stock Reconciliations. These features run inside an authenticated ERPNext site, not on this static page.</p>
+<section class="status" role="status"><span class="dot"></span><div><strong>ERPNext connection required</strong><p>This Pages address is static hosting and is not connected to an authenticated ERPNext site or its database. No figures are displayed here. Deploy and configure the Joe&amp;dave ERPNext feature branch on a real site, then open Operations Intelligence there. The branch is not yet verified on a live Bench/site.</p></div></section>
 <div class="list">
 <div><span class="check">✓</span><span>Read-only calculations from submitted accounting records</span></div>
 <div><span class="check">✓</span><span>Overdue receivables and payables, with source-record links inside ERPNext</span></div>
 <div><span class="check">✓</span><span>Warehouse stock alerts based on configured item reorder levels</span></div>
+<div><span class="check">✓</span><span>Shortcuts to Sales Invoices, Purchase Invoices, customer receipts and supplier payments using native ERPNext forms</span></div>
+<div><span class="check">✓</span><span>Inventory CSV validation with draft Opening Stock or Stock Reconciliation; no automatic submission</span></div>
 <div><span class="check">✓</span><span>Company and user permission-aware data access; no sample-value fallback</span></div>
 </div>
 <a class="link" href="https://github.com/charlonnego/erpnext/tree/custom/operations-intelligence/erpnext/operations_intelligence">Inspect engine source</a>
