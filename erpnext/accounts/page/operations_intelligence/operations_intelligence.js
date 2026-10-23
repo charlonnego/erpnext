@@ -21,6 +21,13 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			</div>
 			<div class="oi-action-list"></div>
 		</section>
+		<section class="oi-actions oi-stock-section">
+			<div class="oi-actions-heading">
+				<h4>${__("Inventory signals")}</h4>
+				<p class="text-muted small">${__("Stock at or below the item's configured reorder level, by warehouse.")}</p>
+			</div>
+			<div class="oi-stock-list"></div>
+		</section>
 		<div class="oi-definitions text-muted small"></div>
 	</div>`).appendTo(page.main);
 
@@ -111,9 +118,42 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		});
 	}
 
+
+	function load_low_stock_items() {
+		const $list = page.body.find(".oi-stock-list").empty();
+		$list.append($("<div class='text-muted small'>").text(__("Checking stock levels…")));
+		frappe.call({
+			method: "erpnext.operations_intelligence.metrics.get_low_stock_items",
+			args: { limit: 10 },
+			freeze: false,
+		}).then((response) => {
+			$list.empty();
+			const data = response.message;
+			if (!data || !data.items || !data.items.length) {
+				$list.append($("<div class='oi-action-empty text-muted'>").text(__("No items at or below a configured reorder level were found in visible stock records.")));
+				return;
+			}
+			data.items.forEach((item) => {
+				const $row = $("<button type='button' class='oi-action-row oi-stock-row'>");
+				const $main = $("<span class='oi-action-main'>");
+				$main.append($("<span class='oi-action-title'>").text(item.item_name || item.item_code));
+				$main.append($("<span class='oi-action-party text-muted'>").text(`${item.item_code} · ${item.warehouse}`));
+				const $detail = $("<span class='oi-action-detail'>");
+				$detail.append($("<span class='oi-action-amount'>").text(`${__("Available")}: ${flt(item.actual_qty)} ${item.stock_uom || ""}`));
+				$detail.append($("<span class='oi-action-due'>").text(`${__("Reorder level")}: ${flt(item.reorder_level)} ${item.stock_uom || ""}`));
+				$row.append($main, $detail);
+				$row.on("click", () => frappe.set_route("Form", "Item", item.item_code));
+				$list.append($row);
+			});
+		}).catch(() => {
+			$list.empty().append($("<div class='text-muted small'>").text(__("Could not load inventory signals. Check Stock and Item permissions, then try again.")));
+		});
+	}
+
 	function refresh_dashboard() {
 		load_overview();
 		load_action_items();
+		load_low_stock_items();
 	}
 
 	function load_overview() {
@@ -157,6 +197,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			.operations-intelligence-page .oi-action-list { border:1px solid var(--border-color); border-radius:10px; overflow:hidden; }
 			.operations-intelligence-page .oi-action-row { width:100%; display:flex; justify-content:space-between; align-items:center; gap:16px; text-align:left; padding:13px 16px; border:0; border-bottom:1px solid var(--border-color); background:var(--card-bg, var(--fg-color)); cursor:pointer; }
 			.operations-intelligence-page .oi-action-row:last-child { border-bottom:0; }
+			.operations-intelligence-page .oi-stock-row .oi-action-amount { color:var(--orange-600, var(--text-color)); }
 			.operations-intelligence-page .oi-action-row:hover { background:var(--subtle-fg); }
 			.operations-intelligence-page .oi-action-main, .operations-intelligence-page .oi-action-detail { display:flex; flex-direction:column; gap:4px; min-width:0; }
 			.operations-intelligence-page .oi-action-title { font-weight:600; overflow-wrap:anywhere; }
