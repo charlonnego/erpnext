@@ -7,6 +7,7 @@ this module never submits accounting or stock documents automatically.
 from __future__ import annotations
 
 import json
+import math
 
 import frappe
 from frappe import _
@@ -51,11 +52,15 @@ def _parse_rows(rows) -> list[dict]:
         if key in seen:
             frappe.throw(_("Row {0}: duplicate item_code and warehouse combination {1} / {2}.").format(index, item_code, warehouse))
         seen.add(key)
+        if row.get("qty") in (None, ""):
+            frappe.throw(_("Row {0}: qty is required.").format(index))
         try:
-            qty = flt(row.get("qty"))
-            valuation_rate = flt(row.get("valuation_rate")) if row.get("valuation_rate") not in (None, "") else None
+            qty = float(str(row.get("qty")).strip())
+            valuation_rate = float(str(row.get("valuation_rate")).strip()) if row.get("valuation_rate") not in (None, "") else None
         except (TypeError, ValueError):
             frappe.throw(_("Row {0}: qty and valuation_rate must be numeric.").format(index))
+        if not math.isfinite(qty) or (valuation_rate is not None and not math.isfinite(valuation_rate)):
+            frappe.throw(_("Row {0}: qty and valuation_rate must be finite numbers.").format(index))
         if qty < 0:
             frappe.throw(_("Row {0}: qty cannot be negative for a physical stock count.").format(index))
         if valuation_rate is not None and valuation_rate < 0:
