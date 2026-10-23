@@ -9,7 +9,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		<div class="oi-intro">
 			<div>
 				<h3>${__("Business at a glance")}</h3>
-				<p class="text-muted">${__("A read-only overview of submitted accounting records visible to your account.")}</p>
+				<p class="text-muted">${__("A live operations workspace for invoices, receipts, inventory reconciliation and business insights, using standard ERPNext controls.")}</p>
 			</div>
 		</div>
 		<div class="oi-status text-muted small mb-3" role="status" aria-live="polite"></div>
