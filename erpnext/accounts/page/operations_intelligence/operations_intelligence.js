@@ -14,6 +14,13 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		</div>
 		<div class="oi-status text-muted small mb-3" role="status" aria-live="polite"></div>
 		<div class="oi-kpi-grid"></div>
+		<section class="oi-actions">
+			<div class="oi-actions-heading">
+				<h4>${__("Action centre")}</h4>
+				<p class="text-muted small">${__("Overdue invoices that may need follow-up. Only records visible to your account are shown.")}</p>
+			</div>
+			<div class="oi-action-list"></div>
+		</section>
 		<div class="oi-definitions text-muted small"></div>
 	</div>`).appendTo(page.main);
 
