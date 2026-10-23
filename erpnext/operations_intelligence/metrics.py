@@ -202,20 +202,20 @@ def get_low_stock_items(limit: int = 10) -> dict:
 		if not item_info:
 			continue
 		reorder = item_info["reorder_levels"].get(warehouse)
-			if not reorder:
-				continue
-			actual_qty = float(bin_row.get("actual_qty") or 0)
-			if actual_qty <= reorder["level"]:
-				low_stock.append({
-					"item_code": item_code,
-					"item_name": item_info["name"],
-					"warehouse": warehouse,
-					"actual_qty": actual_qty,
-					"projected_qty": float(bin_row.get("projected_qty") or 0),
-					"reorder_level": reorder["level"],
-					"reorder_qty": reorder["qty"],
-					"stock_uom": bin_row.get("stock_uom") or item_info["stock_uom"],
-				})
+		if not reorder:
+			continue
+		actual_qty = float(bin_row.get("actual_qty") or 0)
+		if actual_qty <= reorder["level"]:
+			low_stock.append({
+				"item_code": item_code,
+				"item_name": item_info["name"],
+				"warehouse": warehouse,
+				"actual_qty": actual_qty,
+				"projected_qty": float(bin_row.get("projected_qty") or 0),
+				"reorder_level": reorder["level"],
+				"reorder_qty": reorder["qty"],
+				"stock_uom": bin_row.get("stock_uom") or item_info["stock_uom"],
+			})
 	low_stock.sort(key=lambda item: (item["actual_qty"] - item["reorder_level"], item["item_code"], item["warehouse"]))
 	return {"company": company, "items": low_stock[:limit], "as_of_date": today()}
 
