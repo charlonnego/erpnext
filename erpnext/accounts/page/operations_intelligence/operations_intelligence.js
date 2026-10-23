@@ -21,6 +21,13 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			</div>
 			<div class="oi-action-list"></div>
 		</section>
+		<section class="oi-actions oi-engine-section">
+			<div class="oi-actions-heading">
+				<h4>${__("Engine findings")}</h4>
+				<p class="text-muted small">${__("Deterministic alerts calculated from live ERPNext records visible to your account. No sample values or automatic accounting changes.")}</p>
+			</div>
+			<div class="oi-engine-list"></div>
+		</section>
 		<section class="oi-actions oi-stock-section">
 			<div class="oi-actions-heading">
 				<h4>${__("Inventory signals")}</h4>
@@ -150,10 +157,47 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		});
 	}
 
+	function load_engine_insights() {
+		const $list = page.body.find(".oi-engine-list").empty();
+		$list.append($("<div class='text-muted small'>").text(__("Running rules against live records…")));
+		frappe.call({
+			method: "erpnext.operations_intelligence.engine.get_engine_snapshot",
+			args: {
+				from_date: page.from_date.get_value(),
+				to_date: page.to_date.get_value(),
+			},
+			freeze: false,
+		}).then((response) => {
+			$list.empty();
+			const snapshot = response.message;
+			if (!snapshot || snapshot.mode !== "live_read_only" || !Array.isArray(snapshot.alerts)) {
+				$list.append($("<div class='oi-action-empty text-muted'>").text(__("The engine returned an invalid response. No figures have been substituted.")));
+				return;
+			}
+			snapshot.alerts.forEach((alert) => {
+				const $row = $("<div class='oi-engine-row'>");
+				const $main = $("<div class='oi-engine-main'>");
+				const $title = $("<div class='oi-action-title'>").text(alert.title || __("Operational finding"));
+				const $detail = $("<div class='oi-engine-detail text-muted small'>").text(alert.detail || "");
+				$main.append($title, $detail);
+				const severity = ["high", "medium", "info"].includes(alert.severity) ? alert.severity : "info";
+				const $severity = $("<span class='oi-engine-severity'>").addClass("oi-severity-" + severity).text(__(severity));
+				$row.append($main, $severity);
+				$list.append($row);
+			});
+			page.body.find(".oi-status").text(
+				`${__("Company")}: ${snapshot.company} · ${__("Live data")} · ${__("As of")}: ${snapshot.as_of_date}`
+			);
+		}).catch(() => {
+			$list.empty().append($("<div class='oi-action-empty text-muted'>").text(__("Live engine unavailable. Confirm this page is running inside a configured ERPNext site; sample figures are never shown as a fallback.")));
+		});
+	}
+
 	function refresh_dashboard() {
 		load_overview();
 		load_action_items();
 		load_low_stock_items();
+		load_engine_insights();
 	}
 
 	function load_overview() {
@@ -205,6 +249,15 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			.operations-intelligence-page .oi-action-detail { text-align:right; align-items:flex-end; }
 			.operations-intelligence-page .oi-action-amount { font-weight:650; white-space:nowrap; }
 			.operations-intelligence-page .oi-action-empty { padding:18px; }
+			.operations-intelligence-page .oi-engine-list { border:1px solid var(--border-color); border-radius:10px; overflow:hidden; }
+			.operations-intelligence-page .oi-engine-row { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:15px 16px; border-bottom:1px solid var(--border-color); background:var(--card-bg, var(--fg-color)); }
+			.operations-intelligence-page .oi-engine-row:last-child { border-bottom:0; }
+			.operations-intelligence-page .oi-engine-main { display:flex; flex-direction:column; gap:5px; min-width:0; }
+			.operations-intelligence-page .oi-engine-detail { line-height:1.5; }
+			.operations-intelligence-page .oi-engine-severity { flex:none; border-radius:999px; padding:4px 9px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; background:var(--subtle-fg); }
+			.operations-intelligence-page .oi-severity-high { color:var(--red-600, #c83b3b); }
+			.operations-intelligence-page .oi-severity-medium { color:var(--orange-600, #b96b00); }
+			.operations-intelligence-page .oi-severity-info { color:var(--text-muted); }
 			.operations-intelligence-page .oi-definitions { padding:14px 16px; border-radius:8px; background:var(--subtle-fg); line-height:1.6; }
 			@media(max-width:480px) { .operations-intelligence-page .oi-kpi-grid { grid-template-columns:1fr; } }
 		`).appendTo("head");
