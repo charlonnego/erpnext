@@ -24,7 +24,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		<section class="oi-actions oi-stock-section">
 			<div class="oi-actions-heading">
 				<h4>${__("Inventory signals")}</h4>
-				<p class="text-muted small">${__("Stock at or below the item's configured reorder level, by warehouse.")}</p>
+				<p class="text-muted small">${__("Stock at or below the item's configured reorder level, by warehouse. Initial scan is limited to 500 visible stock-bin records.")}</p>
 			</div>
 			<div class="oi-stock-list"></div>
 		</section>
