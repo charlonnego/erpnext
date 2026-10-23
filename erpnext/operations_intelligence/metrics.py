@@ -145,3 +145,77 @@ def get_action_items(limit: int = 10) -> dict:
 		"as_of_date": today_date,
 	}
 
+@frappe.whitelist()
+def get_low_stock_items(limit: int = 10) -> dict:
+	"""Return stock bins at/below configured Item reorder levels.
+
+	Only stock bins and Items visible to the current user are considered. This
+	is an advisory signal, not a reservation or replenishment calculation.
+	"""
+	company = frappe.defaults.get_user_default("Company")
+	if not company:
+		frappe.throw(_("Set a default Company in your user defaults to view Operations Intelligence."))
+
+	try:
+		limit = max(1, min(int(limit), 25))
+	except (TypeError, ValueError):
+		limit = 10
+
+	bins = frappe.get_list(
+		"Bin",
+		filters={"company": company},
+		fields=["item_code", "warehouse", "actual_qty", "projected_qty", "stock_uom"],
+		order_by="actual_qty asc",
+		limit_page_length=500,
+	)
+	items_by_code = {}
+	low_stock = []
+	for bin_row in bins:
+		item_code = bin_row.get("item_code")
+		warehouse = bin_row.get("warehouse")
+		if not item_code or not warehouse:
+			continue
+		if item_code not in items_by_code:
+			if not frappe.get_list(
+				"Item",
+				filters={"name": item_code, "disabled": 0, "is_stock_item": 1},
+				fields=["name"],
+				limit_page_length=1,
+			):
+				items_by_code[item_code] = None
+				continue
+			item_doc = frappe.get_doc("Item", item_code)
+			items_by_code[item_code] = {
+				"name": item_doc.item_name,
+				"stock_uom": item_doc.stock_uom,
+				"reorder_levels": {
+					row.warehouse: {
+						"level": float(row.warehouse_reorder_level or 0),
+						"qty": float(row.warehouse_reorder_qty or 0),
+					}
+					for row in item_doc.get("reorder_levels", [])
+					if row.warehouse
+				},
+				"disabled": False,
+			}
+		item_info = items_by_code[item_code]
+		if not item_info:
+			continue
+		reorder = item_info["reorder_levels"].get(warehouse)
+			if not reorder:
+				continue
+			actual_qty = float(bin_row.get("actual_qty") or 0)
+			if actual_qty <= reorder["level"]:
+				low_stock.append({
+					"item_code": item_code,
+					"item_name": item_info["name"],
+					"warehouse": warehouse,
+					"actual_qty": actual_qty,
+					"projected_qty": float(bin_row.get("projected_qty") or 0),
+					"reorder_level": reorder["level"],
+					"reorder_qty": reorder["qty"],
+					"stock_uom": bin_row.get("stock_uom") or item_info["stock_uom"],
+				})
+	low_stock.sort(key=lambda item: (item["actual_qty"] - item["reorder_level"], item["item_code"], item["warehouse"]))
+	return {"company": company, "items": low_stock[:limit], "as_of_date": today()}
+
