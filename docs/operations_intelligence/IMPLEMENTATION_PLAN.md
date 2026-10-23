@@ -18,7 +18,7 @@ The first release deliberately uses deterministic calculations, existing ERPNext
 ## Next increments
 
 1. Action centre: **initial slice implemented** for overdue submitted sales and purchase invoices. It lists up to 10 permission-visible items, ordered by due date, and opens the source invoice. Low-stock items, delayed projects/tasks and pending approvals remain future work.
-2. Inventory signals: low-stock and slow-moving stock using stock ledger and item reorder settings; test against warehouses and stock UOMs.
+2. Inventory signals: **initial low-stock slice implemented** using warehouse-specific Item reorder levels and visible Bin actual quantities. Slow-moving stock and deeper stock-ledger analysis remain future work; verify against warehouse permissions and stock UOMs in a live site.
 3. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
 4. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
 5. AI business adviser: optional natural-language explanations grounded only in permission-filtered metrics; no autonomous posting, payment, refunds or stock adjustments.
