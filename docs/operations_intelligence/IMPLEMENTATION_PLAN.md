@@ -19,10 +19,11 @@ The first release deliberately uses deterministic calculations, existing ERPNext
 
 1. Action centre: **initial slice implemented** for overdue submitted sales and purchase invoices. It lists up to 10 permission-visible items, ordered by due date, and opens the source invoice. Low-stock items, delayed projects/tasks and pending approvals remain future work.
 2. Inventory signals: **initial low-stock slice implemented** using warehouse-specific Item reorder levels and visible Bin actual quantities. Slow-moving stock and deeper stock-ledger analysis remain future work; verify against warehouse permissions and stock UOMs in a live site.
-3. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
-4. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
-5. AI business adviser: optional natural-language explanations grounded only in permission-filtered metrics; no autonomous posting, payment, refunds or stock adjustments.
-6. Mobile and offline: responsive web first; then a dedicated Android/PWA workflow for offline capture with idempotency keys, retry-safe sync, and explicit conflict resolution.
+3. Live rules engine: `erpnext.operations_intelligence.engine.get_engine_snapshot` composes the KPI, overdue-invoice and low-stock services into deterministic, explainable alerts. It returns `mode=live_read_only`, source context, as-of date and an explicit no-writes flag. The rules only report findings from returned ERPNext records; they do not create example numbers or silently perform actions.
+4. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
+5. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
+6. AI business adviser: optional natural-language explanations grounded only in permission-filtered metrics; no autonomous posting, payment, refunds or stock adjustments.
+7. Mobile and offline: responsive web first; then a dedicated Android/PWA workflow for offline capture with idempotency keys, retry-safe sync, and explicit conflict resolution.
 
 ## Engineering guardrails
 
@@ -42,3 +43,12 @@ The first release deliberately uses deterministic calculations, existing ERPNext
 - Invalid or reversed date ranges fail with a useful validation message.
 - Empty accounts return zero values rather than errors.
 - No writes are performed.
+
+
+## Deployment boundary
+
+The Cloudflare Pages URL is static hosting only. It cannot execute the Frappe Python methods or connect securely to an ERPNext database by itself. The live engine runs inside an authenticated Frappe/ERPNext site; Pages now shows no KPIs or sample records and explicitly states that a site connection is required. A real site deployment and authenticated integration must be completed before users can see live results.
+
+## Current verification status
+
+The backend and dashboard changes are committed to the feature branch, and CI syntax checks are configured. Frappe integration tests have been authored but have **not** been run against a real Bench/site in this environment. Do not describe the engine as production-ready until the test suite passes on the target Frappe version and company/role permissions, Bin schema and reorder-level behavior are verified with real records.
