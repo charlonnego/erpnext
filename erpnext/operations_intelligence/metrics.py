@@ -161,9 +161,21 @@ def get_low_stock_items(limit: int = 10) -> dict:
 	except (TypeError, ValueError):
 		limit = 10
 
+	# Bin is keyed by item and warehouse; company is owned by Warehouse,
+	# not consistently available as a Bin field across supported ERPNext versions.
+	warehouses = frappe.get_list(
+		"Warehouse",
+		filters={"company": company, "is_group": 0},
+		fields=["name"],
+		limit_page_length=5000,
+	)
+	warehouse_names = [row.get("name") for row in warehouses if row.get("name")]
+	if not warehouse_names:
+		return {"company": company, "items": [], "as_of_date": today()}
+
 	bins = frappe.get_list(
 		"Bin",
-		filters={"company": company},
+		filters={"warehouse": ["in", warehouse_names]},
 		fields=["item_code", "warehouse", "actual_qty", "projected_qty", "stock_uom"],
 		order_by="actual_qty asc",
 		limit_page_length=500,
