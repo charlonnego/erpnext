@@ -9,6 +9,7 @@ from erpnext.operations_intelligence.metrics import (
 	_sum_for_company,
 	_validated_period,
 	get_overview,
+	get_action_items,
 )
 
 
@@ -101,3 +102,40 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 				get_overview("2026-10-01", "2026-10-23")
 
 		get_list.assert_not_called()
+
+
+	def test_action_items_returns_overdue_records_in_due_date_order(self):
+		sales = [
+			{"name": "SINV-002", "customer": "Customer B", "due_date": "2026-10-10", "base_outstanding_amount": 100},
+		]
+		purchases = [
+			{"name": "PINV-001", "supplier": "Supplier A", "due_date": "2026-10-05", "base_outstanding_amount": 50},
+		]
+		with (
+			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[sales, purchases]) as get_list,
+			patch("erpnext.operations_intelligence.metrics.frappe.get_cached_value", return_value="NGN"),
+			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-23"),
+		):
+			result = get_action_items("10")
+
+		self.assertEqual(result["company"], "Example Co")
+		self.assertEqual(result["currency"], "NGN")
+		self.assertEqual([item["name"] for item in result["items"]], ["PINV-001", "SINV-002"])
+		self.assertEqual(result["items"][0]["kind"], "Payable")
+		self.assertEqual(result["items"][1]["outstanding_amount"], 100.0)
+		self.assertEqual(get_list.call_count, 2)
+		self.assertEqual(get_list.call_args_list[0].kwargs["limit_page_length"], 10)
+
+	def test_action_items_caps_limit_and_handles_invalid_limit(self):
+		with (
+			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", return_value=[]) as get_list,
+			patch("erpnext.operations_intelligence.metrics.frappe.get_cached_value", return_value="NGN"),
+			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-23"),
+		):
+			result = get_action_items("not-a-number")
+
+		self.assertEqual(result["items"], [])
+		self.assertEqual(get_list.call_args_list[0].kwargs["limit_page_length"], 10)
+		self.assertEqual(get_list.call_args_list[1].kwargs["limit_page_length"], 10)
