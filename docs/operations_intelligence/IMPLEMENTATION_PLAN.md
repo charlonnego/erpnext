@@ -13,7 +13,7 @@ Deliver a server-side KPI endpoint for the active user's default company:
 - Outstanding supplier payables.
 - A clear date range and company in the response.
 
-The first release deliberately uses deterministic calculations, existing ERPNext documents, and Frappe's permission-aware list APIs. It must not invent data, write accounting entries, or make financial decisions automatically.
+The insight engine uses deterministic calculations, existing ERPNext documents, and Frappe's permission-aware APIs. Insight endpoints do not invent data or post accounting entries. Separate transaction workflows open standard ERPNext forms for draft invoices and payment entries, while inventory imports create draft stock reconciliations for explicit review; none are submitted automatically.
 
 ## Next increments
 
