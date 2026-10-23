@@ -1,8 +1,8 @@
-# Operations Intelligence — implementation plan
+# Joe&dave Operations Intelligence — implementation plan
 
 ## Product goal
 
-Add a practical, permission-aware operations intelligence layer to this ERPNext fork for service businesses. ERPNext remains the system of record; this feature summarizes existing transactions and helps owners decide what to do next.
+Add a practical, permission-aware operations intelligence layer to the Joe&dave product, built on this modified ERPNext codebase, for service businesses. The underlying ERPNext records remain the system of record; this feature summarizes existing transactions and helps owners decide what to do next. Keep upstream attribution and license notices intact; see [Joe&dave branding and open-source compliance](../JOE_AND_DAVE_COMPLIANCE.md).
 
 ## First vertical slice: owner overview
 
