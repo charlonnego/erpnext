@@ -1,6 +1,6 @@
 """Unit tests for Operations Intelligence KPI helpers."""
 
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
