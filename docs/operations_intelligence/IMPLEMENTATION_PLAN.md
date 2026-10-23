@@ -23,7 +23,7 @@ The first release deliberately uses deterministic calculations, existing ERPNext
 4. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
 5. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
 6. AI business adviser: optional natural-language explanations grounded only in permission-filtered metrics; no autonomous posting, payment, refunds or stock adjustments.
-7. Mobile and offline: responsive web first; then a dedicated Android/PWA workflow for offline capture with idempotency keys, retry-safe sync, and explicit conflict resolution.
+7. Mobile and offline: responsive web first; then a dedicated Android/PWA workflow for offline capture with idempotency keys, retry-safe sync, and explicit conflict resolution.\n8. Transaction entry: **initial UI slice implemented** with native ERPNext Sales Invoice, Purchase Invoice, Payment Entry (customer receipt and supplier payment) forms. These use standard ERPNext validation and permission checks; users review, save and submit through the native form rather than an unverified custom accounting API.\n9. Inventory harmonization: **CSV preview/validation and draft Stock Reconciliation implemented**. CSV columns: `item_code`, `warehouse`, `qty`, optional `valuation_rate`; one row per item/warehouse; maximum 2,000 rows and 5 MB per file. The server checks the user's default company, leaf warehouses, enabled stock items, duplicates, numeric quantities and create permission. It creates an unsubmitted Stock Reconciliation only after validation; users must review and submit it themselves. Serial/batch-tracked inventory and real-site validation remain explicit compatibility checks.
 
 ## Engineering guardrails
 
@@ -52,3 +52,11 @@ The Cloudflare Pages URL is static hosting only. It cannot execute the Frappe Py
 ## Current verification status
 
 The backend and dashboard changes are committed to the feature branch, and CI syntax checks are configured. Frappe integration tests have been authored but have **not** been run against a real Bench/site in this environment. Do not describe the engine as production-ready until the test suite passes on the target Frappe version and company/role permissions, Bin schema and reorder-level behavior are verified with real records.
+
+
+## Transaction and inventory safeguards
+
+- Invoice and receipt buttons open standard ERPNext forms: Sales Invoice, Purchase Invoice and Payment Entry for Receive/Pay. No invoice is submitted and no money movement is triggered automatically.
+- Inventory CSV rows represent counted on-hand quantities, not quantity deltas. Import produces a draft Stock Reconciliation and does not post stock-ledger or general-ledger entries until an authorized user submits it.
+- Import errors block draft creation. The server repeats validation when creating the draft, limits each batch to 2,000 rows, rejects duplicate item/warehouse combinations and restricts warehouses to the default company.
+- The first CSV format is for standard stock items. Before production, test serial/batch-tracked items, inventory dimensions, valuation rates, opening-stock scenarios, permission combinations and a rollback/reversal workflow on the target ERPNext version.
