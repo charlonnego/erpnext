@@ -11,6 +11,7 @@ from erpnext.operations_intelligence.metrics import (
 	_validated_period,
 	get_overview,
 	get_action_items,
+	get_low_stock_items,
 )
 
 
