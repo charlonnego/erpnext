@@ -84,7 +84,7 @@ def preview_inventory_import(rows) -> dict:
     warehouse_names = {
         row.name for row in frappe.get_list(
             "Warehouse",
-            filters={"company": company, "is_group": 0},
+            filters={"company": company, "is_group": 0, "disabled": 0},
             fields=["name"],
             limit_page_length=5000,
         )
