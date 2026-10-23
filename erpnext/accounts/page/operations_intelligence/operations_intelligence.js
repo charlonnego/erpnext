@@ -53,6 +53,145 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		change: () => load_overview(),
 	});
 	page.set_primary_action(__("Refresh"), refresh_dashboard, "refresh");
+	page.add_inner_button(__("Sales Invoice"), () => {
+		frappe.new_doc("Sales Invoice", { company: frappe.defaults.get_user_default("Company") });
+	}, __("Create"));
+	page.add_inner_button(__("Purchase Invoice"), () => {
+		frappe.new_doc("Purchase Invoice", { company: frappe.defaults.get_user_default("Company") });
+	}, __("Create"));
+	page.add_inner_button(__("Customer Receipt"), () => {
+		frappe.new_doc("Payment Entry", {
+			company: frappe.defaults.get_user_default("Company"),
+			payment_type: "Receive",
+		});
+	}, __("Create"));
+	page.add_inner_button(__("Supplier Payment"), () => {
+		frappe.new_doc("Payment Entry", {
+			company: frappe.defaults.get_user_default("Company"),
+			payment_type: "Pay",
+		});
+	}, __("Create"));
+	page.add_inner_button(__("Import Inventory CSV"), open_inventory_import, __("Inventory"));
+
+	function parse_inventory_csv(text) {
+		const records = [];
+		let row = [], field = "", quoted = false;
+		for (let i = 0; i < text.length; i++) {
+			const char = text[i];
+			if (char === '"' && quoted && text[i + 1] === '"') {
+				field += '"'; i++;
+			} else if (char === '"') {
+				quoted = !quoted;
+			} else if (char === "," && !quoted) {
+				row.push(field); field = "";
+			} else if ((char === "\\n" || char === "\\r") && !quoted) {
+				if (char === "\\r" && text[i + 1] === "\\n") i++;
+				row.push(field); field = "";
+				if (row.some((value) => String(value).trim() !== "")) records.push(row);
+				row = [];
+			} else {
+				field += char;
+			}
+		}
+		if (quoted) throw new Error(__("CSV contains an unclosed quoted field."));
+		row.push(field);
+		if (row.some((value) => String(value).trim() !== "")) records.push(row);
+		if (records.length < 2) throw new Error(__("CSV must contain a header and at least one inventory row."));
+		const headers = records.shift().map((value) => String(value).trim().toLowerCase());
+		const required = ["item_code", "warehouse", "qty"];
+		const missing = required.filter((name) => !headers.includes(name));
+		if (missing.length) throw new Error(__("Missing required columns: {0}").format(missing.join(", ")));
+		return records.map((values) => {
+			const record = {};
+			headers.forEach((header, index) => { record[header] = String(values[index] ?? "").trim(); });
+			return {
+				item_code: record.item_code,
+				warehouse: record.warehouse,
+				qty: record.qty,
+				valuation_rate: record.valuation_rate || null,
+			};
+		});
+	}
+
+	function open_inventory_import() {
+		let parsed_rows = null;
+		let validated = false;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Import Existing Inventory"),
+			 size: "large",
+			fields: [{
+				fieldtype: "HTML",
+				fieldname: "inventory_upload",
+			}],
+			primary_action_label: __("Validate CSV"),
+			primary_action: () => {
+				if (!validated) {
+					const file = dialog.$wrapper.find("input[name='inventory_csv']")[0]?.files?.[0];
+					if (!file) {
+						frappe.msgprint(__("Choose an inventory CSV file first."));
+						return;
+					}
+					const reader = new FileReader();
+					reader.onload = () => {
+						try {
+							parsed_rows = parse_inventory_csv(String(reader.result || ""));
+						} catch (error) {
+							dialog.$wrapper.find(".oi-import-results").text(error.message);
+							return;
+						}
+						dialog.$wrapper.find(".oi-import-results").text(__("Validating {0} rows against your company items and warehouses…").format(parsed_rows.length));
+							frappe.call({
+								method: "erpnext.operations_intelligence.workflows.preview_inventory_import",
+								args: { rows: JSON.stringify(parsed_rows) },
+							}).then((response) => {
+								const result = response.message;
+								if (!result) throw new Error(__("The server returned no validation result."));
+								if (result.errors?.length) {
+									const messages = result.errors.map((error) => __("Row {0}: {1}").format(error.row, error.message));
+									dialog.$wrapper.find(".oi-import-results").text(messages.join("\\n"));
+									validated = false;
+									return;
+								}
+								if (!result.can_create_draft) {
+									dialog.$wrapper.find(".oi-import-results").text(__("No valid rows to import."));
+									return;
+								}
+								validated = true;
+								dialog.$wrapper.find(".oi-import-results").text(__("{0} rows validated for {1}. No stock records have been changed. Click Create Draft to prepare a Stock Reconciliation for review.").format(result.valid_count, result.company));
+								dialog.set_primary_action(__("Create Draft"), () => {
+									frappe.call({
+										method: "erpnext.operations_intelligence.workflows.create_inventory_reconciliation_draft",
+										args: { rows: JSON.stringify(parsed_rows) },
+										freeze: true,
+										freeze_message: __("Creating draft Stock Reconciliation…"),
+									}).then((created_response) => {
+										const created = created_response.message;
+										dialog.hide();
+										frappe.show_alert({ message: created.message, indicator: "green" });
+										frappe.set_route("Form", "Stock Reconciliation", created.name);
+									});
+								});
+							}).catch((error) => {
+								dialog.$wrapper.find(".oi-import-results").text(error.message || __("Validation failed. No changes were made."));
+							});
+					};
+					reader.onerror = () => dialog.$wrapper.find(".oi-import-results").text(__("Could not read the selected CSV file."));
+					reader.readAsText(file);
+					return;
+				}
+			},
+		});
+		dialog.fields_dict.inventory_upload.$wrapper.html(
+			'<div class="oi-import-instructions">' +
+			'<p>' + __("Upload a CSV with columns item_code, warehouse, qty, and optional valuation_rate.") + '</p>' +
+			'<p class="text-muted small">' + __("Use ERPNext item codes and leaf warehouse names exactly. Quantities are physical counted quantities, not changes to add. Duplicate item/warehouse rows are rejected.") + '</p>' +
+			'<p class="text-muted small">' + __("The engine validates the file, then creates a draft Stock Reconciliation. It never submits the stock adjustment automatically.") + '</p>' +
+			'<input type="file" name="inventory_csv" accept=".csv,text/csv" class="form-control" />' +
+			'<pre class="oi-import-results text-muted" role="status" style="white-space:pre-wrap;margin-top:16px"></pre>' +
+			'</div>'
+		);
+		dialog.show();
+	}
 
 	const metric_labels = {
 		sales_value: __("Sales invoiced"),
