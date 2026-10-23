@@ -31,7 +31,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		default: frappe.datetime.get_today(),
 		change: () => load_overview(),
 	});
-	page.set_primary_action(__("Refresh"), load_overview, "refresh");
+	page.set_primary_action(__("Refresh"), refresh_dashboard, "refresh");
 
 	const metric_labels = {
 		sales_value: __("Sales invoiced"),
@@ -161,6 +161,6 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			@media(max-width:480px) { .operations-intelligence-page .oi-kpi-grid { grid-template-columns:1fr; } }
 		`).appendTo("head");
 	}
-	load_overview();
+	refresh_dashboard();
 };
 
