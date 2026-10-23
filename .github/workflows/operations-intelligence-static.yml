@@ -1,0 +1,32 @@
+name: Operations Intelligence static checks
+
+on:
+  push:
+    branches:
+      - custom/operations-intelligence
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "erpnext/operations_intelligence/**"
+      - ".github/workflows/operations-intelligence-static.yml"
+
+jobs:
+  syntax:
+    name: Python and JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Compile Operations Intelligence Python files
+        run: python -m compileall -q erpnext/operations_intelligence
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check dashboard JavaScript syntax
+        run: node --check erpnext/operations_intelligence/page/operations_intelligence/operations_intelligence.js
