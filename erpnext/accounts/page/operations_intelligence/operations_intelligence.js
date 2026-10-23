@@ -165,7 +165,10 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 								dialog.set_primary_action(__("Create Draft"), () => {
 									frappe.call({
 										method: "erpnext.operations_intelligence.workflows.create_inventory_reconciliation_draft",
-										args: { rows: JSON.stringify(parsed_rows) },
+										args: {
+											rows: JSON.stringify(parsed_rows),
+											purpose: dialog.$wrapper.find("select[name='inventory_purpose']").val(),
+										},
 										freeze: true,
 										freeze_message: __("Creating draft Stock Reconciliation…"),
 									}).then((created_response) => {
@@ -188,6 +191,11 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		dialog.fields_dict.inventory_upload.$wrapper.html(
 			'<div class="oi-import-instructions">' +
 			'<p>' + __("Upload a CSV with columns item_code, warehouse, qty, and optional valuation_rate.") + '</p>' +
+			'<label for="inventory_purpose" class="form-label">' + __("Import purpose") + '</label>' +
+			'<select name="inventory_purpose" id="inventory_purpose" class="form-control mb-3">' +
+			'<option value="Stock Reconciliation">' + __("Reconcile existing book stock to physical counts") + '</option>' +
+			'<option value="Opening Stock">' + __("Set opening stock for a new ERPNext stock ledger (valuation_rate required)") + '</option>' +
+			'</select>' +
 			'<p class="text-muted small">' + __("Use ERPNext item codes and leaf warehouse names exactly. Quantities are physical counted quantities, not changes to add. Duplicate item/warehouse rows are rejected.") + '</p>' +
 			'<p class="text-muted small">' + __("The engine validates the file, then creates a draft Stock Reconciliation. It never submits the stock adjustment automatically.") + '</p>' +
 			'<input type="file" name="inventory_csv" accept=".csv,text/csv" class="form-control" />' +
