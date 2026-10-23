@@ -17,7 +17,7 @@ The first release deliberately uses deterministic calculations, existing ERPNext
 
 ## Next increments
 
-1. Action centre: overdue invoices, low-stock items, delayed projects/tasks and documents awaiting approval, each linking to the source record.
+1. Action centre: **initial slice implemented** for overdue submitted sales and purchase invoices. It lists up to 10 permission-visible items, ordered by due date, and opens the source invoice. Low-stock items, delayed projects/tasks and pending approvals remain future work.
 2. Inventory signals: low-stock and slow-moving stock using stock ledger and item reorder settings; test against warehouses and stock UOMs.
 3. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
 4. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
