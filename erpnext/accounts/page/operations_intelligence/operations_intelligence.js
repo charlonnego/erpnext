@@ -97,7 +97,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		row.push(field);
 		if (row.some((value) => String(value).trim() !== "")) records.push(row);
 		if (records.length < 2) throw new Error(__("CSV must contain a header and at least one inventory row."));
-		const headers = records.shift().map((value) => String(value).replace(/^\\uFEFF/, "").trim().toLowerCase());
+		const headers = records.shift().map((value) => String(value).replace(/^\uFEFF/, "").trim().toLowerCase());
 		const required = ["item_code", "warehouse", "qty"];
 		const missing = required.filter((name) => !headers.includes(name));
 		if (missing.length) throw new Error(__("Missing required columns: {0}").format(missing.join(", ")));
