@@ -9,6 +9,7 @@ on:
       - develop
     paths:
       - "erpnext/operations_intelligence/**"
+      - "erpnext/accounts/page/operations_intelligence/**"
       - ".github/workflows/operations-intelligence-static.yml"
 
 jobs:
