@@ -101,13 +101,19 @@ def preview_inventory_import(rows) -> dict:
         item_rows = frappe.get_list(
             "Item",
             filters={"name": row["item_code"], "disabled": 0, "is_stock_item": 1},
-            fields=["name", "stock_uom"],
+            fields=["name", "stock_uom", "has_serial_no", "has_batch_no"],
             limit_page_length=1,
         )
         if not item_rows:
             errors.append({
                 "row": row["row_number"],
                 "message": _("Item {0} is missing, disabled, non-stock, or not visible to you.").format(row["item_code"]),
+            })
+            continue
+        if item_rows[0].get("has_serial_no") or item_rows[0].get("has_batch_no"):
+            errors.append({
+                "row": row["row_number"],
+                "message": _("Item {0} uses serial or batch tracking. This CSV workflow currently accepts standard stock items only; import serial/batch details through the native ERPNext stock workflow.").format(row["item_code"]),
             })
             continue
         row["stock_uom"] = item_rows[0].get("stock_uom")
