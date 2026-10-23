@@ -40,7 +40,7 @@ def get_engine_snapshot(from_date: str | None = None, to_date: str | None = None
             "key": "overdue_receivables",
             "severity": "high",
             "title": _("Overdue customer invoices need review"),
-            "detail": _("{0} overdue customer invoices are visible, with {1} outstanding in company currency.").format(
+            "detail": _("Up to {0} overdue customer invoices are listed, totaling {1} in company currency.").format(
                 len(overdue_receivables), frappe.utils.fmt_money(amount, currency=overview.get("currency"))
             ),
             "count": len(overdue_receivables),
@@ -55,7 +55,7 @@ def get_engine_snapshot(from_date: str | None = None, to_date: str | None = None
             "key": "overdue_payables",
             "severity": "medium",
             "title": _("Overdue supplier invoices need review"),
-            "detail": _("{0} overdue supplier invoices are visible, with {1} outstanding in company currency.").format(
+            "detail": _("Up to {0} overdue supplier invoices are listed, totaling {1} in company currency.").format(
                 len(overdue_payables), frappe.utils.fmt_money(amount, currency=overview.get("currency"))
             ),
             "count": len(overdue_payables),
