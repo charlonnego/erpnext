@@ -11,7 +11,7 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, nowtime, today
+from frappe.utils import getdate, nowtime, today
 
 
 MAX_IMPORT_ROWS = 2000
@@ -125,17 +125,23 @@ def preview_inventory_import(rows) -> dict:
 
 
 @frappe.whitelist()
-def create_inventory_reconciliation_draft(rows, posting_date=None) -> dict:
+def create_inventory_reconciliation_draft(rows, posting_date=None, purpose="Stock Reconciliation") -> dict:
     """Create a draft Stock Reconciliation after repeating server-side validation."""
     _require_create("Stock Reconciliation")
+    if purpose not in ("Opening Stock", "Stock Reconciliation"):
+        frappe.throw(_("Purpose must be Opening Stock or Stock Reconciliation."))
     preview = preview_inventory_import(rows)
     if not preview["can_create_draft"]:
         frappe.throw(_("Resolve all inventory import errors before creating the reconciliation draft."))
+    if purpose == "Opening Stock":
+        missing_rates = [row["item_code"] for row in preview["valid_rows"] if row.get("valuation_rate") is None]
+        if missing_rates:
+            frappe.throw(_("Opening Stock requires a valuation_rate for every row. Missing rate for: {0}").format(", ".join(missing_rates[:20])))
     company = preview["company"]
     posting_date = getdate(posting_date or today())
     doc = frappe.new_doc("Stock Reconciliation")
     doc.company = company
-    doc.purpose = "Stock Reconciliation"
+    doc.purpose = purpose
     doc.posting_date = posting_date
     doc.posting_time = nowtime()
     for row in preview["valid_rows"]:
@@ -153,6 +159,7 @@ def create_inventory_reconciliation_draft(rows, posting_date=None) -> dict:
         "doctype": doc.doctype,
         "docstatus": doc.docstatus,
         "company": company,
+        "purpose": purpose,
         "row_count": len(doc.items),
         "posting_date": str(doc.posting_date),
         "submitted": False,
