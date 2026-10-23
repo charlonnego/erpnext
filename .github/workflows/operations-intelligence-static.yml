@@ -29,4 +29,4 @@ jobs:
         with:
           node-version: "22"
       - name: Check dashboard JavaScript syntax
-        run: node --check erpnext/operations_intelligence/page/operations_intelligence/operations_intelligence.js
+        run: node --check erpnext/accounts/page/operations_intelligence/operations_intelligence.js
