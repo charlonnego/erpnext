@@ -91,3 +91,57 @@ def get_overview(from_date: str | None = None, to_date: str | None = None) -> di
 			"overdue_sales_invoice_count": "Count of submitted Sales Invoices with a positive outstanding amount and a due date before today.",
 		},
 	}
+
+
+@frappe.whitelist()
+def get_action_items(limit: int = 10) -> dict:
+	"""Return a small, read-only list of overdue invoices for follow-up.
+
+	The underlying get_list calls enforce the current user's document permissions.
+	Amounts use company/base currency so sales and purchase items are comparable.
+	"""
+	company = frappe.defaults.get_user_default("Company")
+	if not company:
+		frappe.throw(_("Set a default Company in your user defaults to view Operations Intelligence."))
+
+	try:
+		limit = max(1, min(int(limit), 25))
+	except (TypeError, ValueError):
+		limit = 10
+
+	today_date = today()
+	items = []
+	for doctype, party_field, kind in (
+		("Sales Invoice", "customer", "Receivable"),
+		("Purchase Invoice", "supplier", "Payable"),
+	):
+		rows = frappe.get_list(
+			doctype,
+			filters={
+				"company": company,
+				"docstatus": 1,
+				"outstanding_amount": [">", 0],
+				"due_date": ["<", today_date],
+			},
+			fields=["name", party_field, "due_date", "base_outstanding_amount"],
+			order_by="due_date asc",
+			limit_page_length=limit,
+		)
+		for row in rows:
+			items.append({
+				"doctype": doctype,
+				"name": row.get("name"),
+				"party": row.get(party_field),
+				"due_date": str(row.get("due_date")) if row.get("due_date") else "",
+				"outstanding_amount": float(row.get("base_outstanding_amount") or 0),
+				"kind": kind,
+			})
+
+	items.sort(key=lambda item: item["due_date"] or "9999-12-31")
+	return {
+		"company": company,
+		"currency": frappe.get_cached_value("Company", company, "default_currency"),
+		"items": items[:limit],
+		"as_of_date": today_date,
+	}
+
