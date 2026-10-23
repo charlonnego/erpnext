@@ -84,8 +84,8 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 				quoted = !quoted;
 			} else if (char === "," && !quoted) {
 				row.push(field); field = "";
-			} else if ((char === "\\n" || char === "\\r") && !quoted) {
-				if (char === "\\r" && text[i + 1] === "\\n") i++;
+			} else if ((char === "\n" || char === "\r") && !quoted) {
+				if (char === "\r" && text[i + 1] === "\\n") i++;
 				row.push(field); field = "";
 				if (row.some((value) => String(value).trim() !== "")) records.push(row);
 				row = [];
@@ -148,7 +148,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 								if (!result) throw new Error(__("The server returned no validation result."));
 								if (result.errors?.length) {
 									const messages = result.errors.map((error) => __("Row {0}: {1}").format(error.row, error.message));
-									dialog.$wrapper.find(".oi-import-results").text(messages.join("\\n"));
+									dialog.$wrapper.find(".oi-import-results").text(messages.join("\n"));
 									validated = false;
 									return;
 								}
