@@ -1,5 +1,6 @@
 """Unit tests for Operations Intelligence KPI helpers."""
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -139,3 +140,49 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 		self.assertEqual(result["items"], [])
 		self.assertEqual(get_list.call_args_list[0].kwargs["limit_page_length"], 10)
 		self.assertEqual(get_list.call_args_list[1].kwargs["limit_page_length"], 10)
+
+
+	def test_low_stock_items_flags_bin_at_configured_reorder_level(self):
+		bin_rows = [
+			{"item_code": "ITEM-001", "warehouse": "Main - EX", "actual_qty": 3, "projected_qty": 2, "stock_uom": "Nos"},
+		]
+		item_doc = SimpleNamespace(
+			item_name="Sample Item",
+			stock_uom="Nos",
+			get=lambda field, default=None: [
+				SimpleNamespace(warehouse="Main - EX", warehouse_reorder_level=5, warehouse_reorder_qty=10)
+			] if field == "reorder_levels" else default,
+		)
+		with (
+			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[bin_rows, [{"name": "ITEM-001"}]]) as get_list,
+			patch("erpnext.operations_intelligence.metrics.frappe.get_doc", return_value=item_doc),
+			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-24"),
+		):
+			result = get_low_stock_items(10)
+
+		self.assertEqual(result["company"], "Example Co")
+		self.assertEqual(len(result["items"]), 1)
+		self.assertEqual(result["items"][0]["item_code"], "ITEM-001")
+		self.assertEqual(result["items"][0]["reorder_level"], 5.0)
+		self.assertEqual(result["items"][0]["actual_qty"], 3.0)
+		self.assertEqual(get_list.call_count, 2)
+
+	def test_low_stock_items_skips_items_without_reorder_level(self):
+		bin_rows = [
+			{"item_code": "ITEM-002", "warehouse": "Main - EX", "actual_qty": 0, "projected_qty": 0, "stock_uom": "Nos"},
+		]
+		item_doc = SimpleNamespace(
+			item_name="No Reorder Item",
+			stock_uom="Nos",
+			get=lambda field, default=None: [] if field == "reorder_levels" else default,
+		)
+		with (
+			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[bin_rows, [{"name": "ITEM-002"}]]),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_doc", return_value=item_doc),
+			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-24"),
+		):
+			result = get_low_stock_items()
+
+		self.assertEqual(result["items"], [])
