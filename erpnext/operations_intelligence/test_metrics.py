@@ -156,7 +156,11 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 		)
 		with (
 			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
-			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[bin_rows, [{"name": "ITEM-001"}]]) as get_list,
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[
+				[{"name": "Main - EX"}],
+				bin_rows,
+				[{"name": "ITEM-001"}],
+			]) as get_list,
 			patch("erpnext.operations_intelligence.metrics.frappe.get_doc", return_value=item_doc),
 			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-24"),
 		):
@@ -167,7 +171,7 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 		self.assertEqual(result["items"][0]["item_code"], "ITEM-001")
 		self.assertEqual(result["items"][0]["reorder_level"], 5.0)
 		self.assertEqual(result["items"][0]["actual_qty"], 3.0)
-		self.assertEqual(get_list.call_count, 2)
+		self.assertEqual(get_list.call_count, 3)
 
 	def test_low_stock_items_skips_items_without_reorder_level(self):
 		bin_rows = [
@@ -180,7 +184,11 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 		)
 		with (
 			patch("erpnext.operations_intelligence.metrics.frappe.defaults.get_user_default", return_value="Example Co"),
-			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[bin_rows, [{"name": "ITEM-002"}]]),
+			patch("erpnext.operations_intelligence.metrics.frappe.get_list", side_effect=[
+				[{"name": "Main - EX"}],
+				bin_rows,
+				[{"name": "ITEM-002"}],
+			]),
 			patch("erpnext.operations_intelligence.metrics.frappe.get_doc", return_value=item_doc),
 			patch("erpnext.operations_intelligence.metrics.today", return_value="2026-10-24"),
 		):
