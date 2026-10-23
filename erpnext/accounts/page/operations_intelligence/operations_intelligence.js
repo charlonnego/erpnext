@@ -1,7 +1,7 @@
 frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Operations Intelligence"),
+		title: __("Joe&dave Operations Intelligence"),
 		single_column: true,
 	});
 
@@ -176,7 +176,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 				render_metrics(response.message);
 			}
 		}).catch(() => {
-			page.body.find(".oi-status").text(__("Could not load Operations Intelligence. Check your default Company and accounting permissions, then try again."));
+			page.body.find(".oi-status").text(__("Could not load Joe&dave Operations Intelligence. Check your default Company and accounting permissions, then try again."));
 			page.body.find(".oi-kpi-grid").empty();
 		});
 	}
