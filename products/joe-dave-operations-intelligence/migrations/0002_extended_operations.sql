@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS jd_stock_movements (
  quantity_delta REAL NOT NULL, unit_cost_minor INTEGER NOT NULL DEFAULT 0, reference_type TEXT, reference_id TEXT,
  notes TEXT, actor_user_id TEXT, occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS jd_stock_movement_item_date ON jd_stock_movements(business_id,item_id,created_at);
+CREATE INDEX IF NOT EXISTS jd_stock_movement_item_date ON jd_stock_movements(business_id,item_id,occurred_at);
 CREATE TABLE IF NOT EXISTS jd_stock_counts (
  id TEXT PRIMARY KEY, business_id TEXT NOT NULL, warehouse_id TEXT NOT NULL REFERENCES jd_warehouses(id),
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','counting','submitted','approved','rejected')),
