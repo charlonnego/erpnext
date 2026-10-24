@@ -30,5 +30,7 @@ Authentication uses PBKDF2 password hashes, random bearer tokens whose SHA-256 h
 - Stock opening balances and CSV imports write stock movement records; database guards prevent negative stock and over-receipting.
 - Login attempts are throttled by hashed email/IP identifiers; passwords use PBKDF2 and session token hashes are stored instead of raw tokens.
 
+The deployed Worker source is version-controlled at `cloudflare/worker.js`; `cloudflare/wrangler.toml` defines the Worker and D1 binding. `cloudflare/tests/smoke.mjs` and `.github/workflows/cloudflare-api-smoke.yml` provide live boundary checks and module syntax validation.
+
 ## Important production hardening still required
 This is an active presentation/MVP build, not yet a substitute for a mature ERP. Before handling sensitive or high-volume business operations, add email verification and password reset, rate limiting/bot protection on auth endpoints, stronger session revocation/rotation and CSRF/origin tests, transaction-safe invoice numbering under concurrency, inventory movement posting/reconciliation, supplier/payables and accounting ledgers, exports/backup restore drills, monitoring/alerting, automated integration tests, and an independent security review. Cloudflare Free quotas apply.
