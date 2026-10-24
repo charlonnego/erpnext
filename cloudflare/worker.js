@@ -28,16 +28,17 @@ function allowedForRole(role,path,method){
  if(path==="/workspace/switch")return method==="POST";
  if(path==="/workspace/list")return method==="GET";
  if(path==="/saas/status")return method==="GET";
+ const scopedPath=path.startsWith("/invoices/")?"/invoices":path.startsWith("/purchase-orders/")?"/purchase-orders":path.startsWith("/supplier-bills/")?"/supplier-bills":path.startsWith("/bank-transactions/")?"/bank-transactions":path;
  if(method==="GET"){
   if(role==="accountant")return true;
-  if(role==="sales")return ["/dashboard","/analytics","/customers","/invoices","/receipts"].includes(path);
-  if(role==="inventory")return ["/dashboard","/analytics","/inventory","/inventory/movements","/purchase-orders","/suppliers"].includes(path);
+  if(role==="sales")return ["/dashboard","/analytics","/customers","/invoices","/receipts"].includes(scopedPath);
+  if(role==="inventory")return ["/dashboard","/analytics","/inventory","/inventory/import","/inventory/movements","/purchase-orders","/suppliers"].includes(scopedPath);
   if(role==="viewer")return true;
   return false;
  }
- if(role==="accountant")return ["/customers","/invoices","/receipts","/expenses","/journal","/supplier-bills","/accounting-periods","/bank-accounts","/bank-transactions/import"].includes(path);
- if(role==="sales")return ["/customers","/invoices","/receipts"].includes(path);
- if(role==="inventory")return ["/inventory","/inventory/movements","/purchase-orders"].includes(path);
+ if(role==="accountant")return ["/customers","/invoices","/receipts","/expenses","/journal","/supplier-bills","/accounting-periods","/bank-accounts","/bank-transactions","/bank-transactions/import"].includes(scopedPath);
+ if(role==="sales")return ["/customers","/invoices","/receipts"].includes(scopedPath);
+ if(role==="inventory")return ["/inventory","/inventory/import","/inventory/movements","/purchase-orders"].includes(scopedPath);
  return false;
 }
 async function audit(env,bid,uid0,action,type,id,details={}){await env.DB.prepare("INSERT INTO jd_audit_events(id,business_id,actor_id,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?,?)").bind(uid(),bid,uid0,action,type,id,JSON.stringify(details)).run();}
