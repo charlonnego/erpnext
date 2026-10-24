@@ -250,7 +250,7 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
  }
  function result(id,msg,ok=true){const e=$(id);e.hidden=false;e.className='result '+(ok?'good':'bad');e.textContent=msg;}
  function setStatus(text,ok){$('api-status').innerHTML='<i class="dot" style="background:'+(ok?'var(--green)':'var(--amber)')+'"></i> '+text;$('api-line').textContent=ok?'Online':'Unavailable';}
- async function health(){try{const h=await api('/health');setStatus('API CONNECTED',true);$('db-line').textContent=h.database==='connected'?'Connected':'Unavailable';}catch(e){setStatus('API UNAVAILABLE',false);$('db-line').textContent='Not verified';}}
+ async function health(){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);try{const h=await api('/health',{signal:controller.signal});setStatus('API CONNECTED',true);$('api-line').textContent='Online';$('db-line').textContent=h.database==='connected'?'Connected':'Unavailable';}catch(e){setStatus('API UNAVAILABLE',false);$('api-line').textContent=e.name==='AbortError'?'Timed out after 8 seconds':'Unavailable';$('db-line').textContent='Not verified';}finally{clearTimeout(timer);}}
  function showAuth(){ $('auth-backdrop').style.display='flex'; }
  function hideAuth(){ $('auth-backdrop').style.display='none'; }
  function setMode(mode){authMode=mode;$('auth-form').elements.business_name.required=mode==='register';$('auth-title').textContent=mode==='login'?'Sign in':'Create your workspace';$('auth-submit').textContent=mode==='login'?'Sign in':'Create account';$('register-fields').style.display=mode==='login'?'none':'grid';$('auth-form').elements.password.autocomplete=mode==='login'?'current-password':'new-password';$('auth-msg').hidden=true;}
