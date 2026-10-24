@@ -171,3 +171,54 @@ def create_inventory_reconciliation_draft(rows, posting_date=None, purpose="Stoc
         "submitted": False,
         "message": _("Draft Stock Reconciliation {0} created. Review it before submitting.").format(doc.name),
     }
+
+@frappe.whitelist()
+def create_invoice_follow_up(doctype: str, name: str, description: str, follow_up_date: str | None = None) -> dict:
+    """Create a ToDo assigned to the current user for a real, open invoice.
+
+    The source invoice is never changed. The task is linked to the invoice and
+    assigned only to the caller, avoiding arbitrary task assignment.
+    """
+    allowed_doctypes = {"Sales Invoice", "Purchase Invoice"}
+    if doctype not in allowed_doctypes:
+        frappe.throw(_("Follow-up tasks can only reference Sales Invoice or Purchase Invoice."))
+
+    _require_create("ToDo")
+    company = _company()
+    description = str(description or "").strip()
+    if not description:
+        frappe.throw(_("Enter a follow-up action."))
+    if len(description) > 2000:
+        frappe.throw(_("Follow-up description must be 2,000 characters or fewer."))
+
+    due_date = getdate(follow_up_date or today())
+    if due_date < getdate(today()):
+        frappe.throw(_("Follow-up date cannot be in the past."))
+
+    invoice = frappe.get_doc(doctype, name)
+    invoice.check_permission("read")
+    if invoice.company != company:
+        frappe.throw(_("This invoice does not belong to your default company."), frappe.PermissionError)
+    if invoice.docstatus != 1 or float(invoice.get("outstanding_amount") or 0) <= 0:
+        frappe.throw(_("A follow-up can only be created for a submitted invoice with an outstanding balance."))
+
+    task = frappe.new_doc("ToDo")
+    task.allocated_to = frappe.session.user
+    task.description = description
+    task.date = due_date
+    task.reference_type = doctype
+    task.reference_name = name
+    task.status = "Open"
+    task.priority = "Medium"
+    task.insert()
+
+    return {
+        "name": task.name,
+        "doctype": "ToDo",
+        "allocated_to": task.allocated_to,
+        "reference_type": doctype,
+        "reference_name": name,
+        "date": str(due_date),
+        "message": _("Follow-up task {0} created and assigned to you.").format(task.name),
+    }
+
