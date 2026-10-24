@@ -9,6 +9,8 @@ from __future__ import annotations
 import frappe
 from frappe import _
 
+from erpnext.operations_intelligence.working_capital import get_working_capital_snapshot
+
 from erpnext.operations_intelligence.metrics import (
     get_action_items,
     get_low_stock_items,
@@ -22,6 +24,7 @@ def get_engine_snapshot(from_date: str | None = None, to_date: str | None = None
     overview = get_overview(from_date=from_date, to_date=to_date)
     action_result = get_action_items(limit=25)
     stock_result = get_low_stock_items(limit=25)
+    working_capital = get_working_capital_snapshot()
 
     metrics = overview["metrics"]
     alerts: list[dict] = []
@@ -79,6 +82,34 @@ def get_engine_snapshot(from_date: str | None = None, to_date: str | None = None
             "source": "Bin and Item reorder levels",
         })
 
+    scheduled_net = float(working_capital.get("scheduled_net_due_30_days") or 0)
+    overdue_supplier_90 = working_capital.get("payables", {}).get("overdue_over_90", {})
+    overdue_customer_90 = working_capital.get("receivables", {}).get("overdue_over_90", {})
+    if scheduled_net < 0:
+        alerts.append({
+            "key": "near_term_payment_pressure",
+            "severity": "high",
+            "title": _("Supplier invoices due in 30 days exceed customer invoices due"),
+            "detail": _("Scheduled net due is {0} in the negative. Review expected collections, supplier terms and the actual bank position before making payment decisions.").format(
+                frappe.utils.fmt_money(abs(scheduled_net), currency=overview.get("currency"))
+            ),
+            "amount": scheduled_net,
+            "currency": overview.get("currency"),
+            "source": "Submitted invoices due in the next 30 days",
+        })
+    if int(overdue_customer_90.get("invoice_count") or 0) or int(overdue_supplier_90.get("invoice_count") or 0):
+        alerts.append({
+            "key": "aged_debt_over_90_days",
+            "severity": "high",
+            "title": _("Invoice balances overdue by more than 90 days"),
+            "detail": _("Customer invoices: {0}; supplier invoices: {1}. Review disputed balances, collection ownership and approved payment plans.").format(
+                int(overdue_customer_90.get("invoice_count") or 0),
+                int(overdue_supplier_90.get("invoice_count") or 0),
+            ),
+            "count": int(overdue_customer_90.get("invoice_count") or 0) + int(overdue_supplier_90.get("invoice_count") or 0),
+            "source": "Submitted Sales and Purchase Invoices",
+        })
+
     if not alerts:
         alerts.append({
             "key": "no_current_alerts",
@@ -102,6 +133,7 @@ def get_engine_snapshot(from_date: str | None = None, to_date: str | None = None
         "alerts": alerts,
         "action_items": overdue_invoices,
         "low_stock_items": low_stock,
+        "working_capital": working_capital,
         "as_of_date": frappe.utils.today(),
         "data_source": "ERPNext records visible to the current user",
         "write_operations_performed": False,
