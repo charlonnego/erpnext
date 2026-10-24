@@ -23,6 +23,15 @@ async function auth(req,env){const token=(req.headers.get("Authorization")||"").
 async function ownedBusiness(env,userId,businessId){return await env.DB.prepare("SELECT b.*,m.role AS member_role FROM jd_businesses b JOIN jd_business_memberships m ON m.business_id=b.id WHERE m.user_id=? AND b.id=?").bind(userId,businessId).first();}
 function allowedForRole(role,path,method){
  if(role==="owner"||role==="admin")return true;
+ if(path.startsWith("/ops/")){
+  const p=path.split("/").slice(2),group=p[0]||"",sub=p[1]||"";
+  if(group==="hr")return false;
+  if(group==="inventory"||group==="manufacturing")return role==="inventory";
+  if(group==="crm"||group==="selling"||group==="support")return role==="sales";
+  if(group==="buying")return ["accountant","inventory"].includes(role);
+  if(group==="projects")return role==="accountant";
+  return false;
+ }
  if(path==="/business")return method==="GET";
  if(path==="/workspace/members"||path.startsWith("/workspace/members/"))return false;
  if(path==="/workspace/switch")return method==="POST";
@@ -173,6 +182,8 @@ export default {async fetch(req,env){
    "inventory/items":{table:"jd_items",key:"id",fields:["item_code","name","description","item_type","unit_of_measure","tracking_mode","valuation_method","reorder_level","reorder_quantity","is_active"],required:["item_code","name"],roles:["owner","admin","inventory"]},
    "inventory/warehouses":{table:"jd_warehouses",key:"id",fields:["code","name","address","is_active"],required:["code","name"],roles:["owner","admin","inventory"]},
    "inventory/lots":{table:"jd_stock_lots",key:"id",fields:["item_id","warehouse_id","lot_code","serial_number","expiry_date","quantity_received","quantity_remaining","unit_cost_minor"],required:["item_id","warehouse_id","quantity_received"],roles:["owner","admin","inventory"]},
+   "inventory/movements":{table:"jd_stock_movements",key:"id",fields:["item_id","warehouse_id","lot_id","movement_type","quantity_delta","unit_cost_minor","reference_type","reference_id","notes"],required:["item_id","warehouse_id","quantity_delta"],roles:["owner","admin","inventory"]},
+
    "inventory/counts":{table:"jd_stock_counts",key:"id",fields:["warehouse_id","status","count_date","notes"],required:["warehouse_id","count_date"],roles:["owner","admin","inventory"]},
    "crm/leads":{table:"jd_crm_leads",key:"id",fields:["lead_name","company_name","email","phone","source","stage","estimated_value_minor","currency_code","next_follow_up","owner_user_id","notes"],required:["lead_name"],roles:["owner","admin","sales"]},
    "selling/quotations":{table:"jd_quotations",key:"id",fields:["quote_number","customer_id","lead_id","status","currency_code","subtotal_minor","tax_minor","total_minor","valid_until"],required:["quote_number"],roles:["owner","admin","sales"]},
@@ -204,7 +215,7 @@ export default {async fetch(req,env){
    if(!def.roles.includes(user.role))return json({error:"Your role cannot access this operational resource."},403,origin);
    const table=def.table, id=idPart&&decodeURIComponent(idPart);
    const checkRef=async(field,value)=>{if(!value)return true;const map={item_id:"jd_items",finished_item_id:"jd_items",component_item_id:"jd_items",warehouse_id:"jd_warehouses",supplier_id:"jd_suppliers",employee_id:"jd_employees",project_id:"jd_projects",task_id:"jd_tasks",work_order_id:"jd_work_orders",bom_id:"jd_boms",ticket_id:"jd_support_tickets"};const t=map[field];if(!t)return true;return !!(await env.DB.prepare("SELECT id FROM "+t+" WHERE id=? AND business_id=?").bind(value,bid).first());};
-   const list=async()=>{const r=await env.DB.prepare("SELECT * FROM "+table+" WHERE business_id=? ORDER BY created_at DESC LIMIT 500").bind(bid).all();return r.results||[];};
+   const list=async()=>{const orderCol=entity==="inventory/movements"?"occurred_at":entity==="inventory/lots"?"received_at":entity==="support/messages"?"created_at":"created_at";const r=await env.DB.prepare("SELECT * FROM "+table+" WHERE business_id=? ORDER BY "+orderCol+" DESC LIMIT 500").bind(bid).all();return r.results||[];};
    if(req.method==="GET"&&!idPart)return json({records:await list()},200,origin);
    if(req.method==="GET"&&idPart&&!action){const row=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!row)return json({error:"Record not found."},404,origin);let extra={};if(entity==="manufacturing/boms")extra.lines=(await env.DB.prepare("SELECT * FROM jd_bom_lines WHERE bom_id=?").bind(id).all()).results||[];if(entity==="manufacturing/orders")extra.job_cards=(await env.DB.prepare("SELECT * FROM jd_job_cards WHERE work_order_id=? AND business_id=?").bind(id,bid).all()).results||[];if(entity==="buying/orders")extra.lines=(await env.DB.prepare("SELECT * FROM jd_purchase_order_lines WHERE purchase_order_id=?").bind(id).all()).results||[];return json({record:row,...extra},200,origin);}
    if(req.method==="POST"&&!idPart){
