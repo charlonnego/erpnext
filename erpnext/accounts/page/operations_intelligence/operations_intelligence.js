@@ -28,6 +28,13 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			</div>
 			<div class="oi-engine-list"></div>
 		</section>
+		<section class="oi-actions oi-working-capital-section">
+			<div class="oi-actions-heading">
+				<h4>${__("Working capital watch")}</h4>
+				<p class="text-muted small">${__("Invoice aging and amounts due in the next 30 days. This is not a bank balance or a cash-flow forecast.")}</p>
+			</div>
+			<div class="oi-working-capital"></div>
+		</section>
 		<section class="oi-actions oi-stock-section">
 			<div class="oi-actions-heading">
 				<h4>${__("Inventory signals")}</h4>
@@ -349,11 +356,62 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		});
 	}
 
+	function load_working_capital() {
+		const $panel = page.body.find(".oi-working-capital").empty();
+		$panel.append($("<div class='text-muted small'>").text(__("Calculating invoice aging from submitted records…")));
+		frappe.call({
+			method: "erpnext.operations_intelligence.working_capital.get_working_capital_snapshot",
+			freeze: false,
+		}).then((response) => {
+			const data = response.message;
+			if (!data || !data.receivables || !data.payables) {
+				$panel.empty().append($("<div class='text-muted small'>").text(__("Working capital data is unavailable; no substitute figures are shown.")));
+				return;
+			}
+			$panel.empty();
+			const $summary = $("<div class='oi-working-capital-summary'>");
+			[
+				{ label: __("Customer invoices due in 30 days"), value: data.receivables.due_today_to_7.amount + data.receivables.due_8_to_30.amount },
+				{ label: __("Supplier invoices due in 30 days"), value: data.payables.due_today_to_7.amount + data.payables.due_8_to_30.amount },
+				{ label: __("Scheduled net due (not cash)",), value: data.scheduled_net_due_30_days },
+			].forEach((metric) => {
+				const $card = $("<div class='oi-working-capital-card'>");
+				$card.append($("<div class='oi-working-capital-label'>").text(metric.label));
+				$card.append($("<div class='oi-working-capital-value'>").text(format_currency(metric.value || 0, data.currency)));
+				$summary.append($card);
+			});
+			$panel.append($summary);
+			const $table = $("<table class='table table-bordered table-sm oi-aging-table'>");
+			const $head = $("<thead><tr></tr></thead>");
+			[__("Invoice balance"), __("Open total"), __("1–30 days overdue"), __("31–60 days"), __("61–90 days"), __("Over 90 days"), __("Due in 0–7 days"), __("Due in 8–30 days")].forEach((label) => $head.find("tr").append($("<th>").text(label)));
+			$table.append($head);
+			const $body = $("<tbody>");
+			[
+				{ label: __("Customer receivables"), item: data.receivables },
+				{ label: __("Supplier payables"), item: data.payables },
+			].forEach(({ label, item }) => {
+				const $row = $("<tr>");
+				$row.append($("<th scope='row'>").text(label));
+				["total_open", "overdue_1_30", "overdue_31_60", "overdue_61_90", "overdue_over_90", "due_today_to_7", "due_8_to_30"].forEach((key) => {
+					const amount = item[key]?.amount || 0;
+					$row.append($("<td>").text(format_currency(amount, data.currency)));
+				});
+				$body.append($row);
+			});
+			$table.append($body);
+			$panel.append($table);
+			$panel.append($("<p class='text-muted small'>").text(data.interpretation || ""));
+		}).catch(() => {
+			$panel.empty().append($("<div class='text-muted small'>").text(__("Could not load working capital data. Check invoice permissions and try again.")));
+		});
+	}
+
 	function refresh_dashboard() {
 		load_overview();
 		load_action_items();
 		load_low_stock_items();
 		load_engine_insights();
+		load_working_capital();
 	}
 
 	function load_overview() {
@@ -414,6 +472,11 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			.operations-intelligence-page .oi-severity-high { color:var(--red-600, #c83b3b); }
 			.operations-intelligence-page .oi-severity-medium { color:var(--orange-600, #b96b00); }
 			.operations-intelligence-page .oi-severity-info { color:var(--text-muted); }
+			.operations-intelligence-page .oi-working-capital-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:14px; }
+			.operations-intelligence-page .oi-working-capital-card { padding:15px; border:1px solid var(--border-color); border-radius:10px; background:var(--card-bg, var(--fg-color)); }
+			.operations-intelligence-page .oi-working-capital-label { color:var(--text-muted); font-size:12px; margin-bottom:8px; }
+			.operations-intelligence-page .oi-working-capital-value { color:var(--heading-color); font-size:20px; font-weight:650; overflow-wrap:anywhere; }
+			.operations-intelligence-page .oi-aging-table { display:block; overflow-x:auto; white-space:nowrap; }
 			.operations-intelligence-page .oi-definitions { padding:14px 16px; border-radius:8px; background:var(--subtle-fg); line-height:1.6; }
 			@media(max-width:480px) { .operations-intelligence-page .oi-kpi-grid { grid-template-columns:1fr; } }
 		`).appendTo("head");
