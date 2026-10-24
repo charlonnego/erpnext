@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const path = "docs/operations_intelligence/demo/index.html";
+const path = "cloudflare/site/index.html";
 const html = fs.readFileSync(path, "utf8");
 
 test("all inline browser scripts parse as JavaScript modules", () => {
