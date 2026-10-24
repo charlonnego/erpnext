@@ -20,6 +20,8 @@ Independent custom application. Frappe/ERPNext is not a runtime dependency.
 - `tests/frontend.test.mjs`: inline JS syntax, navigation and API wiring checks
 - `../.github/workflows/cloudflare-api-smoke.yml`: automated checks
 
+**Existing database migration note:** the live D1 schema was provisioned directly through the Cloudflare API before Wrangler migration tracking was initialized. Do not run `wrangler d1 migrations apply` against the live database until its baseline is reconciled, because the existing columns and triggers are already present. The database contains no seeded demo users, customers, invoices, receipts, or inventory records.
+
 ## API routes
 
 - Health: `GET /health`
