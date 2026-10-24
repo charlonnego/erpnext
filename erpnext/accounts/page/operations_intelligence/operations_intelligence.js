@@ -265,7 +265,11 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 				const $main = $("<span class='oi-action-main'>");
 				$main.append($("<span class='oi-action-title'>").text(item.name || __("Invoice")));
 				$main.append($("<span class='oi-action-party text-muted'>").text(item.party || item.kind || ""));
+				if (item.recommended_next_step) {
+					$main.append($("<span class='oi-action-party text-muted'>").text(item.recommended_next_step));
+				}
 				const $detail = $("<span class='oi-action-detail'>");
+				$detail.append($("<span class='oi-action-due'>").text(`${item.days_overdue || 0} ${__("days overdue")}`));
 				$detail.append($("<span class='oi-action-due'>").text(`${__("Due")} ${item.due_date || __("Unknown")}`));
 				$detail.append($("<span class='oi-action-amount'>").text(format_currency(item.outstanding_amount || 0, data.currency)));
 				$row.append($main, $detail);
