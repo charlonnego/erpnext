@@ -1,0 +1,34 @@
+name: Joe&dave SaaS smoke tests
+
+on:
+  push:
+    branches:
+      - custom/operations-intelligence
+    paths:
+      - "cloudflare/worker.js"
+      - "cloudflare/tests/**"
+      - ".github/workflows/saas-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify live API and authentication boundary
+        run: node --test cloudflare/tests/saas-smoke.test.mjs
+        env:
+          JD_API_BASE_URL: https://joe-dave-operations-api.uchechukwuanuforo.workers.dev
+          JD_TEST_EMAIL: ${{ secrets.JD_TEST_EMAIL }}
+          JD_TEST_PASSWORD: ${{ secrets.JD_TEST_PASSWORD }}
+          JD_SECOND_TEST_EMAIL: ${{ secrets.JD_SECOND_TEST_EMAIL }}
+          JD_SECOND_TEST_PASSWORD: ${{ secrets.JD_SECOND_TEST_PASSWORD }}
