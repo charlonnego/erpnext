@@ -1,0 +1,32 @@
+name: Operations Intelligence static checks
+
+on:
+  pull_request:
+    paths:
+      - "erpnext/operations_intelligence/**"
+      - "erpnext/accounts/page/operations_intelligence/**"
+      - ".github/workflows/operations-intelligence-checks.yml"
+  push:
+    branches:
+      - "custom/operations-intelligence"
+    paths:
+      - "erpnext/operations_intelligence/**"
+      - "erpnext/accounts/page/operations_intelligence/**"
+      - ".github/workflows/operations-intelligence-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Python and JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Compile Operations Intelligence Python modules
+        run: python -m compileall -q erpnext/operations_intelligence
+      - name: Check dashboard JavaScript syntax
+        run: node --check erpnext/accounts/page/operations_intelligence/operations_intelligence.js
