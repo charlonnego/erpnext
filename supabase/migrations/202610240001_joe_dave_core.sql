@@ -46,6 +46,7 @@ create table if not exists public.jd_invoices (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (business_id, invoice_number),
+  unique (business_id, id),
   foreign key (business_id, customer_id) references public.jd_customers(business_id, id),
   check (due_date is null or due_date >= issue_date)
 );
@@ -121,6 +122,103 @@ create table if not exists public.jd_audit_events (
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Transactional business rules: totals, receipt allocation and stock ledger.
+create or replace function public.jd_recalculate_invoice(p_business_id uuid, p_invoice_id uuid)
+returns void
+language plpgsql
+set search_path = ''
+as $
+declare
+  v_subtotal numeric(14,2);
+  v_tax numeric(14,2);
+  v_total numeric(14,2);
+  v_paid numeric(14,2);
+begin
+  select coalesce(sum(l.line_subtotal),0), coalesce(sum(l.line_tax),0)
+    into v_subtotal, v_tax
+    from public.jd_invoice_lines l
+   where l.business_id = p_business_id and l.invoice_id = p_invoice_id;
+  v_total := v_subtotal + v_tax;
+  select coalesce(sum(r.amount),0) into v_paid
+    from public.jd_receipts r
+   where r.business_id = p_business_id and r.invoice_id = p_invoice_id;
+  if v_paid > v_total then
+    raise exception 'Receipt total exceeds invoice total';
+  end if;
+  update public.jd_invoices
+     set subtotal = v_subtotal, tax_total = v_tax, total = v_total,
+         amount_paid = v_paid,
+         status = case
+           when status = 'void' then 'void'
+           when v_total > 0 and v_paid >= v_total then 'paid'
+           when v_paid > 0 then 'part_paid'
+           else status
+         end,
+         updated_at = now()
+   where business_id = p_business_id and id = p_invoice_id;
+end;
+$;
+
+create or replace function public.jd_invoice_lines_after_change()
+returns trigger language plpgsql set search_path = '' as $
+begin
+  if tg_op = 'DELETE' then
+    perform public.jd_recalculate_invoice(old.business_id, old.invoice_id);
+    return old;
+  end if;
+  perform public.jd_recalculate_invoice(new.business_id, new.invoice_id);
+  if tg_op = 'UPDATE' and (old.business_id <> new.business_id or old.invoice_id <> new.invoice_id) then
+    perform public.jd_recalculate_invoice(old.business_id, old.invoice_id);
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists jd_invoice_lines_recalculate on public.jd_invoice_lines;
+create trigger jd_invoice_lines_recalculate
+after insert or update or delete on public.jd_invoice_lines
+for each row execute function public.jd_invoice_lines_after_change();
+
+create or replace function public.jd_receipts_after_change()
+returns trigger language plpgsql set search_path = '' as $
+begin
+  if tg_op = 'DELETE' then
+    perform public.jd_recalculate_invoice(old.business_id, old.invoice_id);
+    return old;
+  end if;
+  perform public.jd_recalculate_invoice(new.business_id, new.invoice_id);
+  if tg_op = 'UPDATE' and (old.business_id <> new.business_id or old.invoice_id <> new.invoice_id) then
+    perform public.jd_recalculate_invoice(old.business_id, old.invoice_id);
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists jd_receipts_recalculate on public.jd_receipts;
+create trigger jd_receipts_recalculate
+after insert or update or delete on public.jd_receipts
+for each row execute function public.jd_receipts_after_change();
+
+create or replace function public.jd_stock_movement_apply()
+returns trigger language plpgsql set search_path = '' as $
+begin
+  update public.jd_inventory_items
+     set quantity_on_hand = quantity_on_hand + new.quantity_delta,
+         unit_cost = case when new.unit_cost > 0 then new.unit_cost else unit_cost end,
+         updated_at = now()
+   where business_id = new.business_id and id = new.item_id;
+  if not found then
+    raise exception 'Inventory item not found for this business';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists jd_stock_movement_apply_trigger on public.jd_stock_movements;
+create trigger jd_stock_movement_apply_trigger
+after insert on public.jd_stock_movements
+for each row execute function public.jd_stock_movement_apply();
 
 create index if not exists jd_customers_business_name_idx on public.jd_customers(business_id, name);
 create index if not exists jd_invoices_business_status_due_idx on public.jd_invoices(business_id, status, due_date);
