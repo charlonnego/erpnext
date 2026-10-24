@@ -227,4 +227,4 @@ CREATE TABLE IF NOT EXISTS jd_audit_events (
  id TEXT PRIMARY KEY, business_id TEXT NOT NULL, actor_user_id TEXT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
  action TEXT NOT NULL, before_json TEXT, after_json TEXT, reason TEXT, occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS jd_audit_entity ON jd_audit_events(business_id,entity_type,entity_id,occurred_at);
+CREATE INDEX IF NOT EXISTS jd_audit_entity ON jd_audit_events(business_id,entity_type,entity_id,created_at);
