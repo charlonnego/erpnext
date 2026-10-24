@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS jd_invoices (
 CREATE TABLE IF NOT EXISTS jd_invoice_lines (
  id TEXT PRIMARY KEY, invoice_id TEXT NOT NULL REFERENCES jd_invoices(id) ON DELETE CASCADE, description TEXT NOT NULL,
  quantity REAL NOT NULL CHECK(quantity>0), unit_price_minor INTEGER NOT NULL CHECK(unit_price_minor>=0),
- tax_rate REAL NOT NULL DEFAULT 0 CHECK(tax_rate>=0 AND tax_rate<=100), line_subtotal_minor INTEGER NOT NULL, line_tax_minor INTEGER NOT NULL
+ tax_rate REAL NOT NULL DEFAULT 0 CHECK(tax_rate>=0 AND tax_rate<=100), line_subtotal_minor INTEGER NOT NULL, line_tax_minor INTEGER NOT NULL,
+ item_id TEXT REFERENCES jd_inventory_items(id), unit_cost_minor INTEGER NOT NULL DEFAULT 0 CHECK(unit_cost_minor>=0), cost_total_minor INTEGER NOT NULL DEFAULT 0 CHECK(cost_total_minor>=0)
 );
 CREATE TABLE IF NOT EXISTS jd_receipts (
  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES jd_businesses(id), invoice_id TEXT NOT NULL REFERENCES jd_invoices(id),
