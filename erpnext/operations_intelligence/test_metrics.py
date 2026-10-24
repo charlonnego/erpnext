@@ -126,6 +126,8 @@ class TestOperationsIntelligenceMetrics(FrappeTestCase):
 		self.assertEqual([item["name"] for item in result["items"]], ["PINV-001", "SINV-002"])
 		self.assertEqual(result["items"][0]["kind"], "Payable")
 		self.assertEqual(result["items"][1]["outstanding_amount"], 100.0)
+		self.assertGreater(result["items"][0]["days_overdue"], result["items"][1]["days_overdue"])
+		self.assertIn("supplier", result["items"][0]["recommended_next_step"].lower())
 		self.assertEqual(get_list.call_count, 2)
 		self.assertEqual(get_list.call_args_list[0].kwargs["limit_page_length"], 10)
 
