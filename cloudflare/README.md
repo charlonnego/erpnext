@@ -2,6 +2,12 @@
 
 Independent custom application. Frappe/ERPNext is not a runtime dependency.
 
+## Standalone application source
+- Frontend entry point: `cloudflare/site/index.html` (the product source, not an ERPNext demo page).
+- Cloudflare Pages build output directory: `cloudflare/site`.
+- The web application uses the dedicated Worker API and D1 database below; it does not import, call, or require an ERPNext/Frappe runtime.
+- Keep all customer operations and transaction data in the authenticated API/database. Empty states must remain empty; never seed fake business transactions.
+
 ## Runtime resources
 - Cloudflare Pages project: `joe-dave-operations-intelligence`
 - API Worker: `joe-dave-operations-api`
@@ -17,7 +23,7 @@ Independent custom application. Frappe/ERPNext is not a runtime dependency.
 - `d1/migrations/0003_payables_periods_banking.sql`: supplier bills/payments, period locks and bank reconciliation tables/guards
 - `d1/migrations/0004_branding_templates.sql`: business contact details, compact logo data URL, brand colour and invoice/receipt template preferences
 - `tests/smoke.mjs`: live health/auth/CORS smoke tests
-- `tests/frontend.test.mjs`: inline JS syntax, navigation and API wiring checks
+- `tests/frontend.test.mjs`: inline JS syntax, navigation and API wiring checks against `site/index.html`
 - `../.github/workflows/cloudflare-api-smoke.yml`: automated checks
 
 **Existing database migration note:** the live D1 schema was provisioned directly through the Cloudflare API before Wrangler migration tracking was initialized. Do not run `wrangler d1 migrations apply` against the live database until its baseline is reconciled, because the existing columns and triggers are already present. The database contains no seeded demo users, customers, invoices, receipts, or inventory records.
