@@ -24,5 +24,11 @@ This is an independent application, not a Frappe/ERPNext runtime or fork. The pu
 
 Authentication uses PBKDF2 password hashes, random bearer tokens whose SHA-256 hashes are stored in D1, expiry checks, and business-owner scoping on data reads/writes. The browser holds the session token in tab-scoped session storage. The Worker applies an origin allowlist for the Pages domain family.
 
+## Current engineering status
+- Per-business invoice counters replace count-based invoice numbering.
+- Invoice posting, receipts, and expenses create balanced journal entries; trial balance, profit/loss and audit endpoints are available.
+- Stock opening balances and CSV imports write stock movement records; database guards prevent negative stock and over-receipting.
+- Login attempts are throttled by hashed email/IP identifiers; passwords use PBKDF2 and session token hashes are stored instead of raw tokens.
+
 ## Important production hardening still required
 This is an active presentation/MVP build, not yet a substitute for a mature ERP. Before handling sensitive or high-volume business operations, add email verification and password reset, rate limiting/bot protection on auth endpoints, stronger session revocation/rotation and CSRF/origin tests, transaction-safe invoice numbering under concurrency, inventory movement posting/reconciliation, supplier/payables and accounting ledgers, exports/backup restore drills, monitoring/alerting, automated integration tests, and an independent security review. Cloudflare Free quotas apply.
