@@ -67,3 +67,13 @@ The backend and dashboard changes are committed to the feature branch, and CI sy
 ## Business-smart action prioritization (first rules-based increment)
 
 The overdue action centre now orders visible overdue invoices by days overdue and then outstanding balance, and provides a suggested next step for receivables versus payables. Balances are expressed in the company's base currency. The recommendation is a transparent rule, not an AI prediction; it never sends messages or schedules payments. Staff must verify the record and follow the business's approval process. Future business profiles can configure escalation windows and policies rather than hard-coding one rule for every industry.
+
+## Working capital watch (new rules-based increment)
+
+The dashboard now displays permission-aware aging buckets for open submitted Sales Invoices and Purchase Invoices: 1–30, 31–60, 61–90 and over 90 days overdue, plus invoices due today through day 7 and days 8–30. It shows open receivables/payables and a scheduled net-due indicator (customer invoices due in the next 30 days minus supplier invoices due in that window). The engine raises an alert when scheduled supplier obligations exceed customer invoices due, and when balances have aged beyond 90 days.
+
+This indicator is explicitly **not** a cash balance or cash-flow forecast: it excludes bank balances, payment probability, payroll, taxes, purchase orders, credit facilities and other cash movements. It is a prompt to review actual bank position, collection plans and supplier terms—not a payment instruction. The summary uses submitted invoices, positive outstanding balances, company base currency and permission-aware Frappe lists.
+
+### Current practical scope
+
+Joe&dave is now an operational control layer for three concrete daily tasks: (1) follow up overdue customer and supplier invoices, (2) spot near-term invoice pressure and aged debt, and (3) review low-stock items against configured reorder levels. Users can open native invoice/payment forms and create a validated inventory draft. It does not yet provide verified bank reconciliation, payroll, order fulfilment, task/project SLAs, demand forecasting, or autonomous AI actions. Those should only be added against real ERPNext records and role-tested workflows.
