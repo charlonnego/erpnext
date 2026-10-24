@@ -167,6 +167,127 @@ export default {async fetch(req,env){
   if(path==="/bank-transactions"&&req.method==="GET"){const accountId=url.searchParams.get("account_id");const r=await env.DB.prepare("SELECT t.id,t.bank_account_id,t.transaction_date,t.description,t.amount_minor,t.reference,t.reconciled,t.matched_journal_entry_id,a.name AS account_name FROM jd_bank_transactions t JOIN jd_bank_accounts a ON a.id=t.bank_account_id WHERE t.business_id=? AND (? IS NULL OR t.bank_account_id=?) ORDER BY t.transaction_date DESC LIMIT 1000").bind(bid,accountId,accountId).all();return json({transactions:r.results||[]},200,origin);}
   const bankMatchPrefix="/bank-transactions/";if(path.startsWith(bankMatchPrefix)&&path.endsWith("/reconcile")&&req.method==="POST"){const txnId=path.slice(bankMatchPrefix.length,-10),b=await readJson(req);if(!/^[a-f0-9-]{36}$/i.test(txnId)||!b||!validText(b.journal_entry_id,80))return json({error:"Transaction and journal entry IDs are required."},400,origin);const txn=await env.DB.prepare("SELECT id,amount_minor,reconciled FROM jd_bank_transactions WHERE id=? AND business_id=?").bind(txnId,bid).first();if(!txn)return json({error:"Bank transaction not found."},404,origin);if(txn.reconciled)return json({error:"Transaction is already reconciled."},409,origin);const match=await env.DB.prepare("SELECT e.id FROM jd_journal_entries e JOIN jd_journal_lines l ON l.entry_id=e.id WHERE e.id=? AND e.business_id=? AND e.status='posted' AND l.account_code IN ('1000','1010','1020','1090') AND (CASE WHEN ?>=0 THEN l.debit_minor ELSE l.credit_minor END)=ABS(?) LIMIT 1").bind(b.journal_entry_id,bid,Number(txn.amount_minor),Number(txn.amount_minor)).first();if(!match)return json({error:"No posted cash/bank journal line matches this transaction amount."},409,origin);await env.DB.prepare("UPDATE jd_bank_transactions SET reconciled=1,matched_journal_entry_id=? WHERE id=? AND business_id=? AND reconciled=0").bind(match.id,txnId,bid).run();await audit(env,bid,user.id,"bank_transaction.reconciled","bank_transaction",txnId,{journal_entry_id:match.id});return json({ok:true,matched_journal_entry_id:match.id},200,origin);}
 
+
+  // Joe & Dave operational modules: tenant-scoped, authenticated CRUD and business actions.
+  const opsDefs={
+   "inventory/items":{table:"jd_items",key:"id",fields:["item_code","name","description","item_type","unit_of_measure","tracking_mode","valuation_method","reorder_level","reorder_quantity","is_active"],required:["item_code","name"],roles:["owner","admin","inventory"]},
+   "inventory/warehouses":{table:"jd_warehouses",key:"id",fields:["code","name","address","is_active"],required:["code","name"],roles:["owner","admin","inventory"]},
+   "inventory/lots":{table:"jd_stock_lots",key:"id",fields:["item_id","warehouse_id","lot_code","serial_number","expiry_date","quantity_received","quantity_remaining","unit_cost_minor"],required:["item_id","warehouse_id","quantity_received"],roles:["owner","admin","inventory"]},
+   "inventory/counts":{table:"jd_stock_counts",key:"id",fields:["warehouse_id","status","count_date","notes"],required:["warehouse_id","count_date"],roles:["owner","admin","inventory"]},
+   "crm/leads":{table:"jd_crm_leads",key:"id",fields:["lead_name","company_name","email","phone","source","stage","estimated_value_minor","currency_code","next_follow_up","owner_user_id","notes"],required:["lead_name"],roles:["owner","admin","sales"]},
+   "selling/quotations":{table:"jd_quotations",key:"id",fields:["quote_number","customer_id","lead_id","status","currency_code","subtotal_minor","tax_minor","total_minor","valid_until"],required:["quote_number"],roles:["owner","admin","sales"]},
+   "selling/orders":{table:"jd_sales_orders",key:"id",fields:["order_number","quotation_id","customer_id","status","currency_code","total_minor","requested_date"],required:["order_number"],roles:["owner","admin","sales"]},
+   "buying/suppliers":{table:"jd_suppliers",key:"id",fields:["supplier_code","name","email","phone","address","tax_id","payment_terms_days","is_active"],required:["supplier_code","name"],roles:["owner","admin","accountant","inventory"]},
+   "buying/requests":{table:"jd_material_requests",key:"id",fields:["request_number","requested_by","department","required_date","purpose","status"],required:["request_number"],roles:["owner","admin","inventory"]},
+   "buying/orders":{table:"jd_purchase_orders",key:"id",fields:["po_number","supplier_id","request_id","status","currency_code","order_date","expected_date","subtotal_minor","tax_minor","total_minor","notes"],required:["po_number","supplier_id"],roles:["owner","admin","accountant","inventory"]},
+   "buying/receipts":{table:"jd_purchase_receipts",key:"id",fields:["receipt_number","purchase_order_id","warehouse_id","status","received_by","notes"],required:["receipt_number","purchase_order_id","warehouse_id"],roles:["owner","admin","inventory"]},
+   "buying/invoices":{table:"jd_supplier_invoices",key:"id",fields:["supplier_id","supplier_invoice_number","purchase_order_id","receipt_id","invoice_date","due_date","currency_code","subtotal_minor","tax_minor","total_minor","status","match_status"],required:["supplier_id","supplier_invoice_number"],roles:["owner","admin","accountant"]},
+   "hr/employees":{table:"jd_employees",key:"id",fields:["employee_number","first_name","last_name","email","phone","department","job_title","employment_type","start_date","end_date","base_salary_minor","currency_code","bank_name","bank_account_last4","tax_reference","pension_reference","status"],required:["employee_number","first_name","last_name"],roles:["owner","admin"]},
+   "hr/attendance":{table:"jd_attendance",key:"id",fields:["employee_id","work_date","check_in","check_out","status","minutes_worked","notes"],required:["employee_id","work_date"],roles:["owner","admin"]},
+   "hr/leave":{table:"jd_leave_requests",key:"id",fields:["employee_id","leave_type","start_date","end_date","days","reason","status"],required:["employee_id","leave_type","start_date","end_date","days"],roles:["owner","admin"]},
+   "hr/claims":{table:"jd_expense_claims",key:"id",fields:["employee_id","claim_date","category","description","amount_minor","currency_code","receipt_reference","status"],required:["employee_id","claim_date","category","description","amount_minor"],roles:["owner","admin","accountant"]},
+   "hr/payroll":{table:"jd_payroll_runs",key:"id",fields:["period_start","period_end","pay_date","status","currency_code"],required:["period_start","period_end","pay_date"],roles:["owner","admin"]},
+   "manufacturing/boms":{table:"jd_boms",key:"id",fields:["bom_code","finished_item_id","version","output_quantity","status","notes"],required:["bom_code","finished_item_id"],roles:["owner","admin","inventory"]},
+   "manufacturing/orders":{table:"jd_work_orders",key:"id",fields:["work_order_number","bom_id","planned_quantity","produced_quantity","planned_start","planned_end","actual_start","actual_end","status","priority","work_center"],required:["work_order_number","bom_id","planned_quantity"],roles:["owner","admin","inventory"]},
+   "manufacturing/job-cards":{table:"jd_job_cards",key:"id",fields:["work_order_id","card_number","operation_name","sequence_no","assigned_to","planned_minutes","actual_minutes","status","started_at","completed_at","notes"],required:["work_order_id","card_number","operation_name"],roles:["owner","admin","inventory"]},
+   "projects/projects":{table:"jd_projects",key:"id",fields:["project_code","name","customer_id","description","start_date","end_date","budget_minor","currency_code","billing_method","hourly_rate_minor","status","owner_user_id"],required:["project_code","name"],roles:["owner","admin","accountant"]},
+   "projects/tasks":{table:"jd_tasks",key:"id",fields:["project_id","parent_task_id","title","description","assigned_to","status","priority","planned_start","due_date","completed_at"],required:["project_id","title"],roles:["owner","admin","accountant"]},
+   "projects/timesheets":{table:"jd_timesheets",key:"id",fields:["employee_id","project_id","task_id","work_date","minutes_logged","billable","hourly_rate_minor","notes","status"],required:["employee_id","project_id","work_date","minutes_logged"],roles:["owner","admin","accountant"]},
+   "support/tickets":{table:"jd_support_tickets",key:"id",fields:["ticket_number","customer_id","subject","description","category","priority","status","assigned_to","sla_due_at","first_response_at","resolved_at"],required:["ticket_number","subject","description"],roles:["owner","admin","sales"]},
+   "support/messages":{table:"jd_ticket_messages",key:"id",fields:["ticket_id","message","is_internal"],required:["ticket_id","message"],roles:["owner","admin","sales"]},
+   "support/articles":{table:"jd_knowledge_articles",key:"id",fields:["slug","title","body","category","visibility","status"],required:["slug","title","body"],roles:["owner","admin","sales"]}
+  };
+  const opsMatch=path.match(/^\/ops\/([a-z-]+\/[a-z-]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
+  if(opsMatch){
+   const entity=opsMatch[1],idPart=opsMatch[2],action=opsMatch[3],def=opsDefs[entity];
+   if(!def)return json({error:"Unknown operations module resource."},404,origin);
+   if(!def.roles.includes(user.role))return json({error:"Your role cannot access this operational resource."},403,origin);
+   const table=def.table, id=idPart&&decodeURIComponent(idPart);
+   const checkRef=async(field,value)=>{if(!value)return true;const map={item_id:"jd_items",finished_item_id:"jd_items",component_item_id:"jd_items",warehouse_id:"jd_warehouses",supplier_id:"jd_suppliers",employee_id:"jd_employees",project_id:"jd_projects",task_id:"jd_tasks",work_order_id:"jd_work_orders",bom_id:"jd_boms",ticket_id:"jd_support_tickets"};const t=map[field];if(!t)return true;return !!(await env.DB.prepare("SELECT id FROM "+t+" WHERE id=? AND business_id=?").bind(value,bid).first());};
+   const list=async()=>{const r=await env.DB.prepare("SELECT * FROM "+table+" WHERE business_id=? ORDER BY created_at DESC LIMIT 500").bind(bid).all();return r.results||[];};
+   if(req.method==="GET"&&!idPart)return json({records:await list()},200,origin);
+   if(req.method==="GET"&&idPart&&!action){const row=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!row)return json({error:"Record not found."},404,origin);let extra={};if(entity==="manufacturing/boms")extra.lines=(await env.DB.prepare("SELECT * FROM jd_bom_lines WHERE bom_id=?").bind(id).all()).results||[];if(entity==="manufacturing/orders")extra.job_cards=(await env.DB.prepare("SELECT * FROM jd_job_cards WHERE work_order_id=? AND business_id=?").bind(id,bid).all()).results||[];if(entity==="buying/orders")extra.lines=(await env.DB.prepare("SELECT * FROM jd_purchase_order_lines WHERE purchase_order_id=?").bind(id).all()).results||[];return json({record:row,...extra},200,origin);}
+   if(req.method==="POST"&&!idPart){
+    const b=await readJson(req);if(!b||typeof b!=="object"||Array.isArray(b))return json({error:"A JSON object is required."},400,origin);
+    for(const f of def.required)if(b[f]===undefined||b[f]===null||b[f]==="")return json({error:"Required field: "+f},400,origin);
+    for(const f of def.fields){if(b[f]!==undefined&&typeof b[f]==="string"&&b[f].length>2000)return json({error:f+" exceeds the maximum length."},400,origin);}
+    for(const f of def.fields.filter(f=>/_id$/.test(f)))if(b[f]&&!await checkRef(f,b[f]))return json({error:f+" does not reference a record in this workspace."},422,origin);
+    if(entity==="inventory/items"&&(!["none","batch","serial"].includes(b.tracking_mode||"none")||!["fifo","moving_average"].includes(b.valuation_method||"moving_average")))return json({error:"Select valid tracking and valuation methods."},422,origin);
+    if(entity==="inventory/items"&&(!Number.isFinite(Number(b.reorder_level||0))||Number(b.reorder_level||0)<0||!Number.isFinite(Number(b.reorder_quantity||0))||Number(b.reorder_quantity||0)<0))return json({error:"Reorder values must be non-negative numbers."},422,origin);
+    if(entity==="inventory/movements"){
+      const item=await env.DB.prepare("SELECT id,tracking_mode,valuation_method FROM jd_items WHERE id=? AND business_id=?").bind(b.item_id,bid).first(),wh=await env.DB.prepare("SELECT id FROM jd_warehouses WHERE id=? AND business_id=?").bind(b.warehouse_id,bid).first();
+      const qty=Number(b.quantity_delta),cost=Number(b.unit_cost_minor||0);if(!item||!wh||!Number.isFinite(qty)||qty===0||!Number.isSafeInteger(cost)||cost<0)return json({error:"Select a valid item and warehouse, and provide a non-zero quantity and non-negative integer unit cost."},422,origin);
+      if(item.tracking_mode==="serial"&&Math.abs(qty)!==1)return json({error:"Serial-tracked stock movements must be exactly one unit per serial."},422,origin);
+      if(qty<0){const s=await env.DB.prepare("SELECT COALESCE(SUM(quantity_delta),0) AS q FROM jd_stock_movements WHERE business_id=? AND item_id=? AND warehouse_id=?").bind(bid,b.item_id,b.warehouse_id).first();if(Number(s?.q||0)+qty<0)return json({error:"Insufficient available stock. Negative stock is blocked."},409,origin);}
+      const lotId=b.lot_id||null;if(lotId){const lot=await env.DB.prepare("SELECT id FROM jd_stock_lots WHERE id=? AND business_id=? AND item_id=? AND warehouse_id=?").bind(lotId,bid,b.item_id,b.warehouse_id).first();if(!lot)return json({error:"Lot does not belong to the selected item and warehouse."},422,origin);}
+      const mid=uid();await env.DB.prepare("INSERT INTO jd_stock_movements(id,business_id,item_id,warehouse_id,lot_id,movement_type,quantity_delta,unit_cost_minor,reference_type,reference_id,notes,actor_user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(mid,bid,b.item_id,b.warehouse_id,lotId,b.movement_type||(qty>0?"receipt":"issue"),qty,cost,b.reference_type||null,b.reference_id||null,b.notes||null,user.id).run();
+      if(lotId)await env.DB.prepare("UPDATE jd_stock_lots SET quantity_remaining=MAX(0,quantity_remaining+?) WHERE id=? AND business_id=?").bind(qty,lotId,bid).run();
+      await audit(env,bid,user.id,"stock.movement_posted","stock_movement",mid,{item_id:b.item_id,warehouse_id:b.warehouse_id,quantity_delta:qty,unit_cost_minor:cost});return json({id:mid,posted:true},201,origin);
+    }
+    if(entity==="inventory/counts"){const wh=await env.DB.prepare("SELECT id FROM jd_warehouses WHERE id=? AND business_id=?").bind(b.warehouse_id,bid).first();if(!wh)return json({error:"Warehouse not found."},422,origin);}
+    const rid=uid(),cols=["id","business_id",...def.fields.filter(f=>b[f]!==undefined)],vals=[rid,bid,...def.fields.filter(f=>b[f]!==undefined).map(f=>b[f])];
+    if(entity==="crm/leads"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="selling/quotations"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="selling/orders"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="buying/orders"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="buying/invoices"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="hr/claims"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="hr/payroll"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="projects/projects"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
+    if(entity==="selling/quotations"&&b.created_by===undefined){cols.push("created_by");vals.push(user.id);}
+    if(entity==="selling/orders"&&b.created_by===undefined){cols.push("created_by");vals.push(user.id);}
+    if(entity==="manufacturing/orders"&&b.created_by===undefined){cols.push("created_by");vals.push(user.id);}
+    if(entity==="projects/projects"&&b.owner_user_id===undefined){cols.push("owner_user_id");vals.push(user.id);}
+    if(entity==="inventory/warehouses"&&b.code){const e=await env.DB.prepare("SELECT id FROM jd_warehouses WHERE business_id=? AND code=?").bind(bid,b.code).first();if(e)return json({error:"Warehouse code already exists."},409,origin);}
+    const sql="INSERT INTO "+table+"("+cols.join(",")+") VALUES("+cols.map(()=>"?").join(",")+")";
+    await env.DB.prepare(sql).bind(...vals).run();await audit(env,bid,user.id,entity.replace("/","_")+".created",table,rid,{fields:cols.filter(c=>!["id","business_id"].includes(c))});return json({id:rid,created:true},201,origin);
+   }
+   if(req.method==="PATCH"&&idPart&&!action){
+    const b=await readJson(req);if(!b||typeof b!=="object"||Array.isArray(b))return json({error:"A JSON object is required."},400,origin);
+    const fields=def.fields.filter(f=>b[f]!==undefined);if(!fields.length)return json({error:"No supported fields were supplied."},400,origin);
+    for(const f of fields.filter(f=>/_id$/.test(f)))if(b[f]&&!await checkRef(f,b[f]))return json({error:f+" does not reference a record in this workspace."},422,origin);
+    const existing=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!existing)return json({error:"Record not found."},404,origin);
+    if(entity==="hr/payroll"&&["approved","paid"].includes(b.status)&&!["approved","paid"].includes(existing.status)&&user.role!=="owner")return json({error:"Only the owner may approve or mark payroll paid."},403,origin);
+    await env.DB.prepare("UPDATE "+table+" SET "+fields.map(f=>f+"=?").join(",")+" WHERE id=? AND business_id=?").bind(...fields.map(f=>b[f]),id,bid).run();
+    await audit(env,bid,user.id,entity.replace("/","_")+".updated",table,id,{fields});return json({id,updated:true},200,origin);
+   }
+   if(req.method==="DELETE"&&idPart&&!action){
+    if(!["owner","admin"].includes(user.role))return json({error:"Only an owner or admin can delete draft operational records."},403,origin);
+    const existing=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!existing)return json({error:"Record not found."},404,origin);
+    if(["posted","approved","paid","completed","received","resolved","closed","converted"].includes(String(existing.status||"")))return json({error:"Posted or finalized records cannot be deleted. Use a reversal or status workflow."},409,origin);
+    await env.DB.prepare("DELETE FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).run();await audit(env,bid,user.id,entity.replace("/","_")+".deleted",table,id);return json({id,deleted:true},200,origin);
+   }
+   if(req.method==="POST"&&idPart&&action){
+    const current=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!current)return json({error:"Record not found."},404,origin);
+    if(entity==="hr/payroll"&&action==="calculate"){
+      if(!["draft","calculated"].includes(current.status))return json({error:"Only a draft payroll run can be calculated."},409,origin);
+      const emps=(await env.DB.prepare("SELECT id,base_salary_minor FROM jd_employees WHERE business_id=? AND status='active'").bind(bid).all()).results||[];
+      if(!emps.length)return json({error:"Add active employees before calculating payroll."},409,origin);
+      const statements=[],lines=[];let gross=0,net=0;
+      for(const e of emps){const basic=Number(e.base_salary_minor||0);if(!Number.isSafeInteger(basic)||basic<0)return json({error:"Employee salary data is invalid."},422,origin);const lineId=uid(),payslip="PS-"+current.period_start.replace(/-/g,"")+"-"+lineId.slice(0,6).toUpperCase();statements.push(env.DB.prepare("INSERT INTO jd_payroll_lines(id,payroll_run_id,employee_id,basic_minor,allowances_minor,overtime_minor,paye_minor,pension_minor,other_deductions_minor,gross_minor,net_minor,payslip_reference) VALUES(?,?,?, ?,0,0,0,0,0,?,?,?) ON CONFLICT(payroll_run_id,employee_id) DO UPDATE SET basic_minor=excluded.basic_minor,gross_minor=excluded.gross_minor,net_minor=excluded.net_minor,payslip_reference=excluded.payslip_reference").bind(lineId,id,e.id,basic,basic,basic,payslip));gross+=basic;net+=basic;lines.push({employee_id:e.id,gross_minor:basic,net_minor:basic,payslip_reference:payslip});}
+      statements.push(env.DB.prepare("UPDATE jd_payroll_runs SET status='calculated',gross_total_minor=?,deductions_total_minor=0,net_total_minor=? WHERE id=? AND business_id=?").bind(gross,net,id,bid));await env.DB.batch(statements);await audit(env,bid,user.id,"payroll.calculated","payroll_run",id,{employees:emps.length,gross_minor:gross,net_minor:net,note:"Base salary only; statutory deductions not calculated"});return json({ok:true,employees:emps.length,gross_total_minor:gross,net_total_minor:net,lines},200,origin);
+    }
+    if(entity==="hr/payroll"&&action==="lines"){const r=await env.DB.prepare("SELECT l.*,e.employee_number,e.first_name,e.last_name FROM jd_payroll_lines l JOIN jd_employees e ON e.id=l.employee_id WHERE l.payroll_run_id=?").bind(id).all();return json({lines:r.results||[]},200,origin);}
+    if(entity==="manufacturing/boms"&&action==="lines"&&req.method==="POST"){
+      const b=await readJson(req);if(!Array.isArray(b?.lines)||!b.lines.length||b.lines.length>200)return json({error:"Provide 1–200 BOM component lines."},400,origin);
+      const seen=new Set();for(const l of b.lines){if(!l.component_item_id||!await checkRef("component_item_id",l.component_item_id)||!Number.isFinite(Number(l.quantity_per_output))||Number(l.quantity_per_output)<=0)return json({error:"Every component must be a valid item with a positive quantity."},422,origin);if(l.component_item_id===current.finished_item_id)return json({error:"A finished item cannot directly contain itself."},422,origin);if(seen.has(l.component_item_id))return json({error:"Duplicate component item."},422,origin);seen.add(l.component_item_id);}
+      await env.DB.batch([env.DB.prepare("DELETE FROM jd_bom_lines WHERE bom_id=?").bind(id),...b.lines.map((l,i)=>env.DB.prepare("INSERT INTO jd_bom_lines(id,bom_id,component_item_id,quantity_per_output,scrap_percent,operation_sequence) VALUES(?,?,?,?,?,?)").bind(uid(),id,l.component_item_id,Number(l.quantity_per_output),Number(l.scrap_percent||0),Number(l.operation_sequence||i+1)))]);await audit(env,bid,user.id,"bom.lines_saved","bom",id,{line_count:b.lines.length});return json({ok:true,lines:b.lines.length},200,origin);
+    }
+    if(entity==="projects/tasks"&&action==="complete"){
+      const pending=await env.DB.prepare("SELECT COUNT(*) AS n FROM jd_task_dependencies d JOIN jd_tasks t ON t.id=d.depends_on_task_id WHERE d.task_id=? AND t.status<>'done'").bind(id).first();if(Number(pending?.n||0)>0)return json({error:"Complete prerequisite tasks before completing this task."},409,origin);await env.DB.prepare("UPDATE jd_tasks SET status='done',completed_at=CURRENT_TIMESTAMP WHERE id=? AND business_id=?").bind(id,bid).run();await audit(env,bid,user.id,"task.completed","task",id);return json({ok:true},200,origin);
+    }
+    if(entity==="support/tickets"&&action==="resolve"){await env.DB.prepare("UPDATE jd_support_tickets SET status='resolved',resolved_at=CURRENT_TIMESTAMP WHERE id=? AND business_id=?").bind(id,bid).run();await audit(env,bid,user.id,"ticket.resolved","ticket",id);return json({ok:true},200,origin);}
+    if(entity==="buying/invoices"&&action==="match"){
+      if(!current.purchase_order_id||!current.receipt_id)return json({error:"Invoice matching requires a purchase order and receipt."},409,origin);
+      const po=await env.DB.prepare("SELECT total_minor,supplier_id FROM jd_purchase_orders WHERE id=? AND business_id=?").bind(current.purchase_order_id,bid).first(),receipt=await env.DB.prepare("SELECT id FROM jd_purchase_receipts WHERE id=? AND business_id=? AND status='posted'").bind(current.receipt_id,bid).first();
+      if(!po||!receipt||po.supplier_id!==current.supplier_id)return json({error:"Supplier, order or posted receipt does not match."},409,origin);
+      if(Math.abs(Number(current.total_minor||0)-Number(po.total_minor||0))>0)return json({error:"Invoice total differs from purchase order total. Resolve the variance before approval."},409,origin);
+      await env.DB.prepare("UPDATE jd_supplier_invoices SET status='matched',match_status='matched' WHERE id=? AND business_id=?").bind(id,bid).run();await audit(env,bid,user.id,"supplier_invoice.matched","supplier_invoice",id);return json({ok:true,match_status:"matched"},200,origin);
+    }
+    return json({error:"Unsupported action for this resource."},404,origin);
+   }
+  }
+
   return json({error:"Endpoint not found."},404,origin);
  }catch(e){const reference=uid();console.error("jd_api_request_failed",JSON.stringify({reference,path,method:req.method,stage,name:e?.name||"Error",message:String(e?.message||"unknown").slice(0,180)}));return json({error:path==="/auth/register"?"We could not finish creating your account. Please retry once; if it still fails, share reference "+reference+".":"Request could not be completed. No internal details were exposed.",reference},500,origin);}
 }};
