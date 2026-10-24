@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, get_first_day, today
+from frappe.utils import date_diff, getdate, get_first_day, today
 
 
 def _validated_period(from_date: str | None, to_date: str | None) -> tuple[str, str]:
@@ -128,16 +128,32 @@ def get_action_items(limit: int = 10) -> dict:
 			limit_page_length=limit,
 		)
 		for row in rows:
+			due_date = row.get("due_date")
+			days_overdue = max(0, date_diff(today_date, due_date)) if due_date else 0
+			if kind == "Receivable":
+				next_step = (
+					_("Escalate collection and agree a payment date") if days_overdue > 30
+					else _("Contact the customer and confirm the payment date")
+				)
+			else:
+				next_step = (
+					_("Review supplier terms and arrange an approved payment") if days_overdue > 30
+					else _("Confirm the supplier statement and payment terms")
+				)
 			items.append({
 				"doctype": doctype,
 				"name": row.get("name"),
 				"party": row.get(party_field),
-				"due_date": str(row.get("due_date")) if row.get("due_date") else "",
+				"due_date": str(due_date) if due_date else "",
+				"days_overdue": days_overdue,
 				"outstanding_amount": float(row.get("base_outstanding_amount") or 0),
 				"kind": kind,
+				"recommended_next_step": next_step,
 			})
 
-	items.sort(key=lambda item: item["due_date"] or "9999-12-31")
+	# Prioritize the longest-overdue and largest balances first. This is an
+	# explainable queue ordering, not an AI prediction or an automatic action.
+	items.sort(key=lambda item: (item["days_overdue"], item["outstanding_amount"]), reverse=True)
 	return {
 		"company": company,
 		"currency": frappe.get_cached_value("Company", company, "default_currency"),
