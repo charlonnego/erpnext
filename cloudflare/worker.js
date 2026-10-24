@@ -25,7 +25,7 @@ function allowedForRole(role,path,method){
  if(role==="owner"||role==="admin")return true;
  if(path.startsWith("/ops/")){
   const p=path.split("/").slice(2),group=p[0]||"",sub=p[1]||"";
-  if(group==="hr")return false;
+  if(group==="hr")return role==="hr";
   if(group==="inventory"||group==="manufacturing")return role==="inventory";
   if(group==="crm"||group==="selling"||group==="support")return role==="sales";
   if(group==="buying")return ["accountant","inventory"].includes(role);
@@ -193,11 +193,11 @@ export default {async fetch(req,env){
    "buying/orders":{table:"jd_purchase_orders",key:"id",fields:["order_number","supplier_id","status","order_date","due_date","total_minor","notes"],required:["order_number","supplier_id","order_date"],roles:["owner","admin","accountant","inventory"]},
    "buying/receipts":{table:"jd_purchase_receipts",key:"id",fields:["receipt_number","purchase_order_id","warehouse_id","status","received_by","notes"],required:["receipt_number","purchase_order_id","warehouse_id"],roles:["owner","admin","inventory"]},
    "buying/invoices":{table:"jd_supplier_invoices",key:"id",fields:["supplier_id","supplier_invoice_number","purchase_order_id","receipt_id","invoice_date","due_date","currency_code","subtotal_minor","tax_minor","total_minor","status","match_status"],required:["supplier_id","supplier_invoice_number"],roles:["owner","admin","accountant"]},
-   "hr/employees":{table:"jd_employees",key:"id",fields:["employee_number","first_name","last_name","email","phone","department","job_title","employment_type","start_date","end_date","base_salary_minor","currency_code","bank_name","bank_account_last4","tax_reference","pension_reference","status"],required:["employee_number","first_name","last_name"],roles:["owner","admin"]},
-   "hr/attendance":{table:"jd_attendance",key:"id",fields:["employee_id","work_date","check_in","check_out","status","minutes_worked","notes"],required:["employee_id","work_date"],roles:["owner","admin"]},
-   "hr/leave":{table:"jd_leave_requests",key:"id",fields:["employee_id","leave_type","start_date","end_date","days","reason","status"],required:["employee_id","leave_type","start_date","end_date","days"],roles:["owner","admin"]},
-   "hr/claims":{table:"jd_expense_claims",key:"id",fields:["employee_id","claim_date","category","description","amount_minor","currency_code","receipt_reference","status"],required:["employee_id","claim_date","category","description","amount_minor"],roles:["owner","admin","accountant"]},
-   "hr/payroll":{table:"jd_payroll_runs",key:"id",fields:["period_start","period_end","pay_date","status","currency_code"],required:["period_start","period_end","pay_date"],roles:["owner","admin"]},
+   "hr/employees":{table:"jd_employees",key:"id",fields:["employee_number","first_name","last_name","email","phone","department","job_title","employment_type","start_date","end_date","base_salary_minor","currency_code","bank_name","bank_account_last4","tax_reference","pension_reference","status"],required:["employee_number","first_name","last_name"],roles:["owner","admin","hr"]},
+   "hr/attendance":{table:"jd_attendance",key:"id",fields:["employee_id","work_date","check_in","check_out","status","minutes_worked","notes"],required:["employee_id","work_date"],roles:["owner","admin","hr"]},
+   "hr/leave":{table:"jd_leave_requests",key:"id",fields:["employee_id","leave_type","start_date","end_date","days","reason","status"],required:["employee_id","leave_type","start_date","end_date","days"],roles:["owner","admin","hr"]},
+   "hr/claims":{table:"jd_expense_claims",key:"id",fields:["employee_id","claim_date","category","description","amount_minor","currency_code","receipt_reference","status"],required:["employee_id","claim_date","category","description","amount_minor"],roles:["owner","admin","accountant","hr"]},
+   "hr/payroll":{table:"jd_payroll_runs",key:"id",fields:["period_start","period_end","pay_date","status","currency_code"],required:["period_start","period_end","pay_date"],roles:["owner","admin","hr"]},
    "manufacturing/boms":{table:"jd_boms",key:"id",fields:["bom_code","finished_item_id","version","output_quantity","status","notes"],required:["bom_code","finished_item_id"],roles:["owner","admin","inventory"]},
    "manufacturing/orders":{table:"jd_work_orders",key:"id",fields:["work_order_number","bom_id","planned_quantity","produced_quantity","planned_start","planned_end","actual_start","actual_end","status","priority","work_center","warehouse_id"],required:["work_order_number","bom_id","planned_quantity"],roles:["owner","admin","inventory"]},
    "manufacturing/job-cards":{table:"jd_job_cards",key:"id",fields:["work_order_id","card_number","operation_name","sequence_no","assigned_to","planned_minutes","actual_minutes","status","started_at","completed_at","notes"],required:["work_order_id","card_number","operation_name"],roles:["owner","admin","inventory"]},
