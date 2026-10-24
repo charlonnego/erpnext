@@ -1,36 +1,51 @@
 # Joe&dave Operations Intelligence — Cloudflare runtime
 
-This is an independent application, not a Frappe/ERPNext runtime or fork. The public UI is deployed on Cloudflare Pages; authenticated business logic runs in Cloudflare Workers; records are stored in a dedicated Cloudflare D1 database.
+Independent custom application. Frappe/ERPNext is not a runtime dependency.
 
 ## Runtime resources
-- Pages project: `joe-dave-operations-intelligence`
+- Cloudflare Pages project: `joe-dave-operations-intelligence`
 - API Worker: `joe-dave-operations-api`
-- D1 database: `joe-dave-operations`
+- Dedicated D1 database: `joe-dave-operations`
 - API origin: `https://joe-dave-operations-api.uchechukwuanuforo.workers.dev`
-- D1 binding: `DB`
+- Worker D1 binding: `DB`
 
-## Migration
-`migrations/0001_joe_dave_core.sql` describes the fresh-install schema. The live D1 database was provisioned from the same core schema and includes the `warehouse` column on inventory items. It contains no seeded demo users, customers, invoices, receipts, or inventory records.
+## Versioned deployment assets
+- `worker.js`: deployed Worker source
+- `wrangler.toml`: Worker deployment and D1 binding
+- `d1/migrations/0001_joe_dave_core.sql`: business, customers, invoices, receipts, inventory, audit and sessions
+- `d1/migrations/0002_accounting_inventory_controls.sql`: suppliers, expenses, purchase orders, journal ledger, auth attempts, stock/receipt/receiving guards
+- `d1/migrations/0003_payables_periods_banking.sql`: supplier bills/payments, period locks and bank reconciliation tables/guards
+- `tests/smoke.mjs`: live health/auth/CORS smoke tests
+- `tests/frontend.test.mjs`: inline JS syntax, navigation and API wiring checks
+- `../.github/workflows/cloudflare-api-smoke.yml`: automated checks
 
-## Implemented API
-- `GET /health`
-- `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
-- `GET /business`, `PUT /business`
-- `GET/POST /customers`
-- `GET/POST /invoices`
-- `POST /invoices/:id/receipts`
-- `GET/POST /inventory`, `POST /inventory/import`
-- `GET /dashboard`
+## API routes
 
-Authentication uses PBKDF2 password hashes, random bearer tokens whose SHA-256 hashes are stored in D1, expiry checks, and business-owner scoping on data reads/writes. The browser holds the session token in tab-scoped session storage. The Worker applies an origin allowlist for the Pages domain family.
+- Health: `GET /health`
+- Authentication: `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
+- Business: `GET /business`, `PUT /business`
+- Dashboard: `GET /dashboard`
+- Customers: `GET/POST /customers`
+- Suppliers: `GET/POST /suppliers`
+- Invoices and receipts: `GET/POST /invoices`, `POST /invoices/:id/receipts`
+- Inventory: `GET/POST /inventory`, `POST /inventory/import`, `GET/POST /inventory/movements`
+- Purchasing: `GET/POST /purchase-orders`, `GET /purchase-orders/:id`, `POST /purchase-orders/:id/receive`
+- Expenses: `GET/POST /expenses`
+- Supplier payables: `GET/POST /supplier-bills`, `POST /supplier-bills/:id/payments`
+- Accounting: `GET /journal`, `GET /reports/trial-balance`, `GET /reports/profit-loss?from=YYYY-MM-DD&to=YYYY-MM-DD`, `GET /reports/inventory-valuation`, `GET /reports/audit`
+- Periods: `GET/POST /accounting-periods`
+- Banking: `GET/POST /bank-accounts`, `POST /bank-transactions/import`, `GET /bank-transactions`, `POST /bank-transactions/:id/reconcile`
 
-## Current engineering status
-- Per-business invoice counters replace count-based invoice numbering.
-- Invoice posting, receipts, and expenses create balanced journal entries; trial balance, profit/loss and audit endpoints are available.
-- Stock opening balances and CSV imports write stock movement records; database guards prevent negative stock and over-receipting.
-- Login attempts are throttled by hashed email/IP identifiers; passwords use PBKDF2 and session token hashes are stored instead of raw tokens.
+## Security and accounting controls
+- Passwords use PBKDF2-HMAC-SHA-256 with 210,000 iterations and a random salt.
+- Random 256-bit bearer session tokens are held in tab-scoped session storage; only SHA-256 token hashes are stored in D1. Sessions expire after seven days.
+- Reads and writes are scoped to the authenticated owner's business.
+- Login attempts are throttled using hashed email/IP identifiers; CORS rejects untrusted origins.
+- Invoice and purchase-order numbers use per-business counters.
+- Invoice posting, receipts, expenses, supplier bills and supplier payments create balanced journal entries. Receipt/payable triggers prevent overpayment.
+- Inventory opening balances, imports and purchase receiving create stock movements; database triggers prevent negative stock and over-receiving.
+- Closed periods reject new invoices, expenses, bills, receipts, payments and journal postings.
+- No sample financial records are seeded. Cloudflare Free quotas apply.
 
-The deployed Worker source is version-controlled at `cloudflare/worker.js`; `cloudflare/wrangler.toml` defines the Worker and D1 binding. `cloudflare/tests/smoke.mjs` and `.github/workflows/cloudflare-api-smoke.yml` provide live boundary checks and module syntax validation.
-
-## Important production hardening still required
-This is an active presentation/MVP build, not yet a substitute for a mature ERP. Before handling sensitive or high-volume business operations, add email verification and password reset, production-grade rate limiting/bot protection, stronger session revocation/rotation, credit notes/refunds, inventory valuation/COGS accounting, purchase-order-to-bill three-way matching, bank-statement CSV parsing and reconciliation exception handling, exports/backup restore drills, monitoring/alerting, multi-user roles/permissions, automated end-to-end tests, and an independent security review. Cloudflare Free quotas apply.
+## Production release gates still outstanding
+This is a functional MVP/presentation build, not yet feature-equivalent to a mature ERP and not yet ready for statutory or high-value accounting without further work. Outstanding items include email verification and password reset, stronger managed rate limiting/bot protection and session revocation, credit notes/refunds, inventory COGS accounting and valuation layers, purchase-order-to-bill three-way matching, bank statement CSV import and reconciliation exceptions, backup/restore drills, monitoring/alerts, multi-user roles and permissions, comprehensive end-to-end write tests, jurisdiction-specific tax controls, and independent security review.
