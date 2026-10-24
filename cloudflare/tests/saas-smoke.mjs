@@ -75,6 +75,11 @@ try {
       for (const path of ['/dashboard','/analytics'].concat(collectionPaths, ['/journal','/reports/trial-balance','/reports/profit-loss','/reports/audit','/reports/inventory-valuation'])) {
         await request(path, { token: u.token });
       }
+      await request('/workspace/members', { token: u.token });
+      await request('/customers', { method: 'POST', token: u.token, body: {}, expected: 400 });
+      await request('/invoices', { method: 'POST', token: u.token, body: {}, expected: 400 });
+      await request('/inventory', { method: 'POST', token: u.token, body: {}, expected: 400 });
+      await request('/workspace/switch', { method: 'POST', token: u.token, body: {}, expected: 400 });
       const collections = {};
       for (const path of collectionPaths) collections[path] = idsOf(await request(path, { token: u.token }));
       authenticated.push(Object.assign({}, u, { business, collections }));
