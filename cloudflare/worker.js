@@ -8,13 +8,14 @@ const json=(data,status=200,origin)=>new Response(JSON.stringify(data),{status,h
 const uid=()=>crypto.randomUUID();
 const hex=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
 const digest=async s=>hex(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)));
-async function hashPassword(password,saltHex){
+const PASSWORD_ITERATIONS=100000;
+async function hashPassword(password,saltHex,iterations=PASSWORD_ITERATIONS){
  const salt=saltHex?Uint8Array.from(saltHex.match(/../g).map(x=>parseInt(x,16))):crypto.getRandomValues(new Uint8Array(16));
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
- const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:210000,hash:"SHA-256"},key,256);
- return {stored:"pbkdf2$210000$"+hex(salt)+"$"+hex(bits),hash:hex(bits)};
+ const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations,hash:"SHA-256"},key,256);
+ return {stored:"pbkdf2$"+iterations+"$"+hex(salt)+"$"+hex(bits),hash:hex(bits)};
 }
-async function verifyPassword(password,stored){const p=String(stored||"").split("$");if(p.length!==4||p[0]!=="pbkdf2"||p[1]!=="210000")return false;return (await hashPassword(password,p[2])).hash===p[3];}
+async function verifyPassword(password,stored){const p=String(stored||"").split("$"),iterations=Number(p[1]);if(p.length!==4||p[0]!=="pbkdf2"||!Number.isInteger(iterations)||iterations<10000||iterations>PASSWORD_ITERATIONS||!/^[a-f0-9]{32}$/i.test(p[2])||!/^[a-f0-9]{64}$/i.test(p[3]))return false;return (await hashPassword(password,p[2],iterations)).hash===p[3];}
 async function readJson(req){try{const len=Number(req.headers.get("Content-Length")||0);if(len>1000000)return null;return await req.json();}catch{return null;}}
 const validText=(v,max=200)=>typeof v==="string"&&v.trim().length>0&&v.trim().length<=max;
 const dateOk=v=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+"T00:00:00Z"));
