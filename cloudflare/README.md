@@ -15,6 +15,7 @@ Independent custom application. Frappe/ERPNext is not a runtime dependency.
 - `d1/migrations/0001_joe_dave_core.sql`: business, customers, invoices, receipts, inventory, audit and sessions
 - `d1/migrations/0002_accounting_inventory_controls.sql`: suppliers, expenses, purchase orders, journal ledger, auth attempts, stock/receipt/receiving guards
 - `d1/migrations/0003_payables_periods_banking.sql`: supplier bills/payments, period locks and bank reconciliation tables/guards
+- `d1/migrations/0004_branding_templates.sql`: business contact details, compact logo data URL, brand colour and invoice/receipt template preferences
 - `tests/smoke.mjs`: live health/auth/CORS smoke tests
 - `tests/frontend.test.mjs`: inline JS syntax, navigation and API wiring checks
 - `../.github/workflows/cloudflare-api-smoke.yml`: automated checks
@@ -25,9 +26,11 @@ Independent custom application. Frappe/ERPNext is not a runtime dependency.
 - Authentication: `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
 - Business: `GET /business`, `PUT /business`
 - Dashboard: `GET /dashboard`
+- Data analysis: `GET /analytics` (12-month invoicing, receipt collections, recorded expenses, expense categories, top customers and recorded-cost gross profit)
 - Customers: `GET/POST /customers`
 - Suppliers: `GET/POST /suppliers`
-- Invoices and receipts: `GET/POST /invoices`, `POST /invoices/:id/receipts`
+- Invoices and receipts: `GET/POST /invoices`, `GET /invoices/:id`, `GET /receipts`, `POST /invoices/:id/receipts`
+- Business identity and documents: `GET/PUT /business` supports logo, contact details, accent colour, and invoice/receipt template preferences. The UI exports invoice/receipt PDFs through the browser print dialog and renders JPG files locally.
 - Inventory: `GET/POST /inventory`, `POST /inventory/import`, `GET/POST /inventory/movements`
 - Purchasing: `GET/POST /purchase-orders`, `GET /purchase-orders/:id`, `POST /purchase-orders/:id/receive`
 - Expenses: `GET/POST /expenses`
@@ -45,6 +48,7 @@ Independent custom application. Frappe/ERPNext is not a runtime dependency.
 - Invoice posting, receipts, expenses, supplier bills and supplier payments create balanced journal entries. Receipt/payable triggers prevent overpayment.
 - Inventory opening balances, imports and purchase receiving create stock movements; database triggers prevent negative stock and over-receiving.
 - Closed periods reject new invoices, expenses, bills, receipts, payments and journal postings.
+- Logo images are restricted to PNG/JPEG/WebP under 90 KB and stored as a validated data URL in D1 for this $0 presentation build. Move logos to object storage if uploads or usage grow.
 - No sample financial records are seeded. Cloudflare Free quotas apply.
 
 ## Production release gates still outstanding
