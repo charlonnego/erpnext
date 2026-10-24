@@ -28,7 +28,7 @@ test("live business modules are wired to the API", () => {
 });
 
 test("branding, professional document export and data analysis controls exist", () => {
-  for (const fragment of ["brand-logo-file", "invoice_template", "receipt_template", "invoice-pdf", "invoice-jpg", "receipt-pdf", "receipt-jpg", "analytics-chart", "analytics-insights", "api('/analytics')"]) {
+  for (const fragment of ["brand-logo-file", "invoice_template", "receipt_template", "invoice-pdf", "invoice-jpg", "receipt-pdf", "receipt-jpg", "analytics-chart", "analytics-monthly-table", "analytics-insights", "api('/analytics')"]) {
     assert.ok(html.includes(fragment), "missing document/analytics feature: " + fragment);
   }
 });
