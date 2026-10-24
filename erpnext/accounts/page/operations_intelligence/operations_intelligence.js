@@ -373,7 +373,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			[
 				{ label: __("Customer invoices due in 30 days"), value: data.receivables.due_today_to_7.amount + data.receivables.due_8_to_30.amount },
 				{ label: __("Supplier invoices due in 30 days"), value: data.payables.due_today_to_7.amount + data.payables.due_8_to_30.amount },
-				{ label: __("Scheduled net due (not cash)",), value: data.scheduled_net_due_30_days },
+				{ label: __("Scheduled net due (not cash)"), value: data.scheduled_net_due_30_days },
 			].forEach((metric) => {
 				const $card = $("<div class='oi-working-capital-card'>");
 				$card.append($("<div class='oi-working-capital-label'>").text(metric.label));
