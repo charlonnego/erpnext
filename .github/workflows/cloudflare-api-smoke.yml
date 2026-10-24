@@ -5,6 +5,7 @@ on:
     branches: [custom/operations-intelligence]
     paths:
       - 'cloudflare/**'
+      - 'docs/operations_intelligence/demo/index.html'
       - '.github/workflows/cloudflare-api-smoke.yml'
   workflow_dispatch:
 
