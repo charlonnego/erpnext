@@ -62,3 +62,8 @@ The backend and dashboard changes are committed to the feature branch, and CI sy
 - Inventory CSV rows represent counted on-hand quantities, not quantity deltas. Import produces a draft Stock Reconciliation and does not post stock-ledger or general-ledger entries until an authorized user submits it.
 - Import errors block draft creation. The server repeats validation when creating the draft, limits each batch to 2,000 rows, rejects duplicate item/warehouse combinations and restricts warehouses to the default company.
 - The first CSV format is for standard stock items. Before production, test serial/batch-tracked items, inventory dimensions, valuation rates, opening-stock scenarios, permission combinations and a rollback/reversal workflow on the target ERPNext version.
+
+
+## Business-smart action prioritization (first rules-based increment)
+
+The overdue action centre now orders visible overdue invoices by days overdue and then outstanding balance, and provides a suggested next step for receivables versus payables. Balances are expressed in the company's base currency. The recommendation is a transparent rule, not an AI prediction; it never sends messages or schedules payments. Staff must verify the record and follow the business's approval process. Future business profiles can configure escalation windows and policies rather than hard-coding one rule for every industry.
