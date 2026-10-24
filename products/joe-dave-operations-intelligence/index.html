@@ -387,7 +387,7 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
  async function exportDocument(kind,format){
   const win=format==='pdf'?window.open('about:blank','_blank'):null;
   try{const doc=docText(await fetchDoc(kind),kind);$('document-preview').hidden=false;$('document-preview').innerHTML=doc.html;$('document-msg').hidden=true;
-   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script><script src="/operations-modules.js?v=20261024-hr" defer></script>
+   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script><script src="/operations-modules.js?v=20261024-hr" defer><\/script>
 
 <script>
 /* Independent watchdog: ensure API status cannot remain on "Checking" indefinitely. */
