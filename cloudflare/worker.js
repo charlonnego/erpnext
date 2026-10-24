@@ -295,6 +295,7 @@ export default {async fetch(req,env){
     for(const f of fields.filter(f=>/_id$/.test(f)))if(b[f]&&!await checkRef(f,b[f]))return json({error:f+" does not reference a record in this workspace."},422,origin);
     const existing=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!existing)return json({error:"Record not found."},404,origin);
     if(entity==="hr/payroll"&&["approved","paid"].includes(b.status)&&!["approved","paid"].includes(existing.status)&&user.role!=="owner")return json({error:"Only the owner may approve or mark payroll paid."},403,origin);
+    if(entity==="support/articles"||entity==="crm/leads"){fields.push("updated_at");b.updated_at=new Date().toISOString();}
     await env.DB.prepare("UPDATE "+table+" SET "+fields.map(f=>f+"=?").join(",")+" WHERE id=? AND business_id=?").bind(...fields.map(f=>b[f]),id,bid).run();
     await audit(env,bid,user.id,entity.replace("/","_")+".updated",table,id,{fields});return json({id,updated:true},200,origin);
    }
