@@ -23,7 +23,8 @@ async function auth(req,env){const token=(req.headers.get("Authorization")||"").
 async function ownedBusiness(env,userId,businessId){return await env.DB.prepare("SELECT b.*,m.role AS member_role FROM jd_businesses b JOIN jd_business_memberships m ON m.business_id=b.id WHERE m.user_id=? AND b.id=?").bind(userId,businessId).first();}
 function allowedForRole(role,path,method){
  if(role==="owner"||role==="admin")return true;
- if(path==="/business"||path==="/workspace/members"||path.startsWith("/workspace/members/"))return false;
+ if(path==="/business")return method==="GET";
+ if(path==="/workspace/members"||path.startsWith("/workspace/members/"))return false;
  if(path==="/workspace/switch")return method==="POST";
  if(path==="/workspace/list")return method==="GET";
  if(path==="/saas/status")return method==="GET";
