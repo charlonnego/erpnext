@@ -272,7 +272,7 @@ export default {async fetch(req,env){
     if(entity==="inventory/counts"){const wh=await env.DB.prepare("SELECT id FROM jd_warehouses WHERE id=? AND business_id=?").bind(b.warehouse_id,bid).first();if(!wh)return json({error:"Warehouse not found."},422,origin);}
     const rid=uid(),cols=["id","business_id",...def.fields.filter(f=>b[f]!==undefined)],vals=[rid,bid,...def.fields.filter(f=>b[f]!==undefined).map(f=>b[f])];
     if(entity==="inventory/lots"&&b.quantity_remaining===undefined){cols.push("quantity_remaining");vals.push(Number(b.quantity_received||0));}
-    if(entity==="support/messages"){cols.push("author_user_id");vals.push(user.id);cols.push("business_id");vals.push(bid);}
+    if(entity==="support/messages"){cols.push("author_user_id");vals.push(user.id);}
     if(entity==="crm/leads"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
     if(entity==="selling/quotations"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
     if(entity==="selling/orders"&&b.currency_code===undefined){cols.push("currency_code");vals.push(business.currency_code);}
