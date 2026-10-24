@@ -305,6 +305,11 @@ export default {async fetch(req,env){
     for(const f of fields.filter(f=>/_id$/.test(f)))if(b[f]&&!await checkRef(f,b[f]))return json({error:f+" does not reference a record in this workspace."},422,origin);
     const existing=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!existing)return json({error:"Record not found."},404,origin);
     if(entity==="hr/payroll"&&["approved","paid"].includes(b.status)&&!["approved","paid"].includes(existing.status)&&user.role!=="owner")return json({error:"Only the owner may approve or mark payroll paid."},403,origin);
+    if(entity==="hr/payroll"&&b.status==="approved"&&existing.status!=="calculated")return json({error:"Calculate payroll before approval."},409,origin);
+    if(entity==="hr/payroll"&&b.status==="paid"&&existing.status!=="approved")return json({error:"Approve payroll before marking it paid."},409,origin);
+    if(entity==="hr/payroll"&&b.status==="calculated")return json({error:"Use the Calculate action to generate payroll lines."},409,origin);
+    if(entity==="buying/invoices"&&b.match_status!==undefined)return json({error:"Invoice match status is set only by the matching workflow."},409,origin);
+    if(entity==="selling/quotations"&&["accepted","converted"].includes(b.status))return json({error:"Use the Accept and Convert actions after adding quotation lines."},409,origin);
     if(entity==="inventory/movements")return json({error:"Stock ledger entries are immutable. Post a correcting movement instead."},409,origin);
     if(entity==="inventory/counts"&&b.status!==undefined)return json({error:"Stock-count status is changed only by the approval workflow."},409,origin);
     if(entity==="buying/orders"&&b.status!==undefined)return json({error:"Purchase-order status is changed through the Order and receipt workflows."},409,origin);
@@ -314,9 +319,14 @@ export default {async fetch(req,env){
     if(entity==="projects/tasks"&&b.status==="done")return json({error:"Use the Complete action so task prerequisites are checked."},409,origin);
     if(entity==="projects/timesheets"&&b.status==="invoiced")return json({error:"Timesheets are marked invoiced only when a draft invoice is generated."},409,origin);
     if(entity==="hr/leave"&&["approved","rejected"].includes(b.status)&&user.role!=="owner"&&user.role!=="admin")return json({error:"Only an owner or admin may approve or reject leave."},403,origin);
+    if(entity==="hr/leave"&&["approved","rejected"].includes(b.status)&&existing.status!=="pending")return json({error:"Only pending leave requests can be reviewed."},409,origin);
     if(entity==="hr/claims"&&["approved","rejected","paid"].includes(b.status)&&user.role!=="owner"&&user.role!=="admin")return json({error:"Only an owner or admin may approve expense claims."},403,origin);
+    if(entity==="hr/claims"&&b.status==="paid"&&existing.status!=="approved")return json({error:"Approve an expense claim before marking it paid."},409,origin);
+    if(entity==="hr/claims"&&["approved","rejected"].includes(b.status)&&existing.status!=="submitted")return json({error:"Only submitted expense claims can be reviewed."},409,origin);
     if(entity==="projects/timesheets"&&["approved","invoiced"].includes(b.status)&&user.role!=="owner"&&user.role!=="admin")return json({error:"Only an owner or admin may approve or finalize a timesheet."},403,origin);
+    if(entity==="projects/timesheets"&&b.status==="approved"&&existing.status!=="submitted")return json({error:"Only submitted timesheets can be approved."},409,origin);
     if(entity==="buying/requests"&&b.status==="approved"&&user.role!=="owner"&&user.role!=="admin")return json({error:"Only an owner or admin may approve material requests."},403,origin);
+    if(entity==="buying/requests"&&b.status==="approved"&&existing.status!=="submitted")return json({error:"Submit a material request before approval."},409,origin);
     if(entity==="support/articles"||entity==="crm/leads"){fields.push("updated_at");b.updated_at=new Date().toISOString();}
     await env.DB.prepare("UPDATE "+table+" SET "+fields.map(f=>f+"=?").join(",")+" WHERE id=? AND business_id=?").bind(...fields.map(f=>b[f]),id,bid).run();
     await audit(env,bid,user.id,entity.replace("/","_")+".updated",table,id,{fields});return json({id,updated:true},200,origin);
