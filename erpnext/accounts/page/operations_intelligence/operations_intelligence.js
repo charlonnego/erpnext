@@ -335,8 +335,10 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			const snapshot = response.message;
 			if (!snapshot || snapshot.mode !== "live_read_only" || !Array.isArray(snapshot.alerts)) {
 				$list.append($("<div class='oi-action-empty text-muted'>").text(__("The engine returned an invalid response. No figures have been substituted.")));
+				render_working_capital(null);
 				return;
 			}
+			render_working_capital(snapshot.working_capital);
 			snapshot.alerts.forEach((alert) => {
 				const $row = $("<div class='oi-engine-row'>");
 				const $main = $("<div class='oi-engine-main'>");
@@ -356,54 +358,43 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		});
 	}
 
-	function load_working_capital() {
+	function render_working_capital(data) {
 		const $panel = page.body.find(".oi-working-capital").empty();
-		$panel.append($("<div class='text-muted small'>").text(__("Calculating invoice aging from submitted records…")));
-		frappe.call({
-			method: "erpnext.operations_intelligence.working_capital.get_working_capital_snapshot",
-			freeze: false,
-		}).then((response) => {
-			const data = response.message;
-			if (!data || !data.receivables || !data.payables) {
-				$panel.empty().append($("<div class='text-muted small'>").text(__("Working capital data is unavailable; no substitute figures are shown.")));
-				return;
-			}
-			$panel.empty();
-			const $summary = $("<div class='oi-working-capital-summary'>");
-			[
-				{ label: __("Customer invoices due in 30 days"), value: data.receivables.due_today_to_7.amount + data.receivables.due_8_to_30.amount },
-				{ label: __("Supplier invoices due in 30 days"), value: data.payables.due_today_to_7.amount + data.payables.due_8_to_30.amount },
-				{ label: __("Scheduled net due (not cash)"), value: data.scheduled_net_due_30_days },
-			].forEach((metric) => {
-				const $card = $("<div class='oi-working-capital-card'>");
-				$card.append($("<div class='oi-working-capital-label'>").text(metric.label));
-				$card.append($("<div class='oi-working-capital-value'>").text(format_currency(metric.value || 0, data.currency)));
-				$summary.append($card);
-			});
-			$panel.append($summary);
-			const $table = $("<table class='table table-bordered table-sm oi-aging-table'>");
-			const $head = $("<thead><tr></tr></thead>");
-			[__("Invoice balance"), __("Open total"), __("1–30 days overdue"), __("31–60 days"), __("61–90 days"), __("Over 90 days"), __("Due in 0–7 days"), __("Due in 8–30 days")].forEach((label) => $head.find("tr").append($("<th>").text(label)));
-			$table.append($head);
-			const $body = $("<tbody>");
-			[
-				{ label: __("Customer receivables"), item: data.receivables },
-				{ label: __("Supplier payables"), item: data.payables },
-			].forEach(({ label, item }) => {
-				const $row = $("<tr>");
-				$row.append($("<th scope='row'>").text(label));
-				["total_open", "overdue_1_30", "overdue_31_60", "overdue_61_90", "overdue_over_90", "due_today_to_7", "due_8_to_30"].forEach((key) => {
-					const amount = item[key]?.amount || 0;
-					$row.append($("<td>").text(format_currency(amount, data.currency)));
-				});
-				$body.append($row);
-			});
-			$table.append($body);
-			$panel.append($table);
-			$panel.append($("<p class='text-muted small'>").text(data.interpretation || ""));
-		}).catch(() => {
-			$panel.empty().append($("<div class='text-muted small'>").text(__("Could not load working capital data. Check invoice permissions and try again.")));
+		if (!data || !data.receivables || !data.payables) {
+			$panel.append($("<div class='text-muted small'>").text(__("Working capital data is unavailable; no substitute figures are shown.")));
+			return;
+		}
+		const $summary = $("<div class='oi-working-capital-summary'>");
+		[
+			{ label: __("Customer invoices due in 30 days"), value: data.receivables.due_today_to_7.amount + data.receivables.due_8_to_30.amount },
+			{ label: __("Supplier invoices due in 30 days"), value: data.payables.due_today_to_7.amount + data.payables.due_8_to_30.amount },
+			{ label: __("Scheduled net due (not cash)"), value: data.scheduled_net_due_30_days },
+		].forEach((metric) => {
+			const $card = $("<div class='oi-working-capital-card'>");
+			$card.append($("<div class='oi-working-capital-label'>").text(metric.label));
+			$card.append($("<div class='oi-working-capital-value'>").text(format_currency(metric.value || 0, data.currency)));
+			$summary.append($card);
 		});
+		$panel.append($summary);
+		const $table = $("<table class='table table-bordered table-sm oi-aging-table'>");
+		const $head = $("<thead><tr></tr></thead>");
+		[__("Invoice balance"), __("Open total"), __("1–30 days overdue"), __("31–60 days"), __("61–90 days"), __("Over 90 days"), __("Due in 0–7 days"), __("Due in 8–30 days")].forEach((label) => $head.find("tr").append($("<th>").text(label)));
+		$table.append($head);
+		const $body = $("<tbody>");
+		[
+			{ label: __("Customer receivables"), item: data.receivables },
+			{ label: __("Supplier payables"), item: data.payables },
+		].forEach(({ label, item }) => {
+			const $row = $("<tr>");
+			$row.append($("<th scope='row'>").text(label));
+			["total_open", "overdue_1_30", "overdue_31_60", "overdue_61_90", "overdue_over_90", "due_today_to_7", "due_8_to_30"].forEach((key) => {
+				$row.append($("<td>").text(format_currency(item[key]?.amount || 0, data.currency)));
+			});
+			$body.append($row);
+		});
+		$table.append($body);
+		$panel.append($table);
+		$panel.append($("<p class='text-muted small'>").text(data.interpretation || ""));
 	}
 
 	function refresh_dashboard() {
@@ -411,7 +402,6 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		load_action_items();
 		load_low_stock_items();
 		load_engine_insights();
-		load_working_capital();
 	}
 
 	function load_overview() {
