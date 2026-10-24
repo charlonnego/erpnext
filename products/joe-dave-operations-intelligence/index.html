@@ -387,30 +387,7 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
  async function exportDocument(kind,format){
   const win=format==='pdf'?window.open('about:blank','_blank'):null;
   try{const doc=docText(await fetchDoc(kind),kind);$('document-preview').hidden=false;$('document-preview').innerHTML=doc.html;$('document-msg').hidden=true;
-   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script><script src="/operations-modules.js?v=20261024-hr" defer><\/script>
-
-<script>
-/* Independent watchdog: ensure API status cannot remain on "Checking" indefinitely. */
-(function(){
- const badge=document.getElementById('api-status');
- const apiLine=document.getElementById('api-line');
- const dbLine=document.getElementById('db-line');
- if(!badge)return;
- let finished=false;
- const finish=(ok,message,db)=>{
-  if(finished)return; finished=true;
-  badge.innerHTML='<i class="dot" style="background:'+(ok?'var(--green)':'var(--red)')+'"></i> API STATUS · '+message;
-  if(apiLine)apiLine.textContent=ok?'Online':message;
-  if(dbLine)dbLine.textContent=db||'Not verified';
- };
- const timer=setTimeout(()=>finish(false,'TIMEOUT · CHECK NETWORK / API','Not verified'),7000);
- fetch('https://joe-dave-operations-api.uchechukwuanuforo.workers.dev/health',{method:'GET',mode:'cors',cache:'no-store',signal:AbortSignal.timeout(6500)})
-  .then(async r=>{if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();if(!d||d.ok!==true)throw new Error('Health check failed');clearTimeout(timer);finish(true,'CONNECTED',d.database==='connected'?'Connected':'Unavailable');})
-  .catch(e=>{clearTimeout(timer);finish(false,e.name==='TimeoutError'?'TIMEOUT · API DID NOT RESPOND':'UNAVAILABLE · '+(e.message||'connection failed').slice(0,48),'Not verified');});
-})();
-</script>
-
-</body></html>');win.document.close();return;}
+   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script></body></html>');win.document.close();return;}
    const b=doc.business;const lines=kind==='receipt'?['Payment received for '+doc.invoice.invoice_number,'Amount received: '+money(doc.receipt.amount_minor,b.currency_code),'Method: '+doc.receipt.payment_method,'Date: '+String(doc.receipt.received_at||'').slice(0,10)]:[...(doc.lines||[]).map(l=>l.description+' | '+Number(l.quantity)+' x '+money(l.unit_price_minor,b.currency_code)+' = '+money(l.line_subtotal_minor,b.currency_code)),'Subtotal: '+money(doc.invoice.subtotal_minor,b.currency_code),'Tax: '+money(doc.invoice.tax_minor,b.currency_code),'Total: '+money(doc.invoice.total_minor,b.currency_code),'Paid: '+money(doc.invoice.paid_minor,b.currency_code),'Balance due: '+money(Math.max(0,doc.invoice.total_minor-doc.invoice.paid_minor),b.currency_code)];
    const escXml=xmlEsc,accent=(kind==='receipt'?b.receipt_template:b.invoice_template)==='minimal'?'#202820':(b.brand_color||'#245b3a');let y=300,svg='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600"><rect width="1200" height="1600" fill="#fff"/><rect width="1200" height="18" fill="'+escXml(accent)+'"/>';
    if(b.logo_data_url)svg+='<image href="'+escXml(b.logo_data_url)+'" x="70" y="65" width="170" height="100" preserveAspectRatio="xMidYMid meet"/>';
@@ -457,6 +434,20 @@ document.getElementById('offline-export')?.addEventListener('click',()=>{const n
 document.getElementById('adviser-run')?.addEventListener('click',async()=>{const btn=document.getElementById('adviser-run'),state=document.getElementById('adviser-state'),summary=document.getElementById('adviser-summary'),box=document.getElementById('adviser-findings'),msg=document.getElementById('adviser-msg');btn.disabled=true;state.textContent='Reviewing live records…';box.innerHTML='';msg.hidden=true;try{if(!token)throw new Error('Sign in before running a workspace review.');const results=await Promise.allSettled([api('/dashboard'),api('/invoices'),api('/expenses'),api('/inventory'),api('/supplier-bills'),api('/bank-transactions')]);const labels=['dashboard','invoices','expenses','inventory','supplier bills','bank transactions'];const data={};results.forEach((r,i)=>{if(r.status==='fulfilled')data[labels[i]]=r.value});if(!Object.keys(data).length)throw new Error('No live data could be loaded. Check your connection and sign-in.');const findings=[];const invs=data.invoices?.invoices||data.invoices?.results||[];const bills=data['supplier bills']?.bills||data['supplier bills']?.supplier_bills||[];const stock=data.inventory?.items||data.inventory?.inventory||[];const today=new Date().toISOString().slice(0,10);const outstanding=x=>Math.max(0,Number(x.total_minor||0)-Number(x.paid_minor||0));const overdue=invs.filter(x=>x.due_date&&x.due_date<today&&outstanding(x)>0&&x.status!=='void');if(overdue.length){const amount=overdue.reduce((n,x)=>n+outstanding(x),0);findings.push({level:'high',title:overdue.length+' overdue customer invoice(s)',detail:'Recorded outstanding balance: '+money(amount,business?.currency_code||'NGN')+'. Review the source invoices and follow up with customers.',action:'Open invoices',page:'invoices'})}else if(data.invoices)findings.push({level:'ok',title:'No overdue invoices identified in the records loaded',detail:'This is based only on invoices returned to your account; verify date and payment completeness.',page:'invoices'});const low=stock.filter(x=>x.reorder_level!=null&&Number(x.quantity_on_hand??x.quantity??0)<=Number(x.reorder_level));if(low.length)findings.push({level:'high',title:low.length+' stock item(s) at or below reorder level',detail:'Check availability and approved purchase orders before reordering.',action:'Review inventory',page:'inventory'});else if(data.inventory)findings.push({level:'ok',title:'No reorder-level exception identified',detail:'Only items with recorded quantity and reorder level can be assessed.',page:'inventory'});const openBills=bills.filter(x=>outstanding(x)>0&&x.status!=='void');if(openBills.length)findings.push({level:'medium',title:openBills.length+' supplier bill(s) remain outstanding',detail:'Confirm due dates, supplier statements and approvals before payment.',action:'Review payables',page:'payables'});const tx=data['bank transactions']?.transactions||data['bank transactions']?.bank_transactions||[];const unreconciled=tx.filter(x=>!x.reconciled_at&&x.status!=='reconciled');if(unreconciled.length)findings.push({level:'medium',title:unreconciled.length+' bank transaction(s) may need reconciliation',detail:'Match statement lines against recorded receipts and payments before closing the period.',action:'Open banking',page:'banking'});const sum=data.dashboard?.summary||{};if(data.dashboard){const e=Number(sum.month_expenses_minor||0),c=Number(sum.month_collected_minor||sum.collected_minor||0);if(e>0&&c===0)findings.push({level:'medium',title:'Expenses are recorded but collections are zero for this summary period',detail:'Check the selected period and receipt postings; this is a review prompt, not proof of a cash-flow problem.'})}if(!findings.length)findings.push({level:'info',title:'No rule-based exception found in the data returned',detail:'This is not an audit opinion. Review source records, access controls and reconciliations before relying on the figures.'});box.innerHTML=findings.map(f=>'<div class="list-row"><div><span class="tag '+(f.level==='high'?'warn':f.level==='ok'?'good':'')+'">'+esc(f.level.toUpperCase())+'</span><b>'+esc(f.title)+'</b><small>'+esc(f.detail)+'</small></div>'+(f.page?'<button class="button secondary" data-adviser-page="'+esc(f.page)+'">'+esc(f.action||'Review')+'</button>':'')+'</div>').join('');box.querySelectorAll('[data-adviser-page]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.adviserPage)));state.textContent='Review complete · '+findings.length+' finding(s)';summary.textContent='Reviewed the live records your account could access. '+results.filter(r=>r.status==='fulfilled').length+' of '+results.length+' data sources responded. Missing sources are not treated as zero.'}catch(e){msg.hidden=false;msg.textContent=e.message||'The live review could not complete.';state.textContent='Review unavailable'}finally{btn.disabled=false}});
 jdRenderNotes();jdConnectivity();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));}
+</script>
+<script src="/operations-modules.js?v=20261024-hr" defer></script>
+<script>
+/* Resolve the API indicator even if the primary app initialisation fails. */
+(function(){
+ const badge=document.getElementById('api-status'),apiLine=document.getElementById('api-line'),dbLine=document.getElementById('db-line');
+ if(!badge)return;
+ let finished=false;
+ const finish=(ok,message,db)=>{if(finished)return;finished=true;badge.innerHTML='<i class="dot" style="background:'+(ok?'var(--green)':'var(--red)')+'"></i> API STATUS · '+message;if(apiLine)apiLine.textContent=ok?'Online':message;if(dbLine)dbLine.textContent=db||'Not verified';};
+ const timer=setTimeout(()=>finish(false,'TIMEOUT · CHECK NETWORK / API','Not verified'),7000);
+ fetch('https://joe-dave-operations-api.uchechukwuanuforo.workers.dev/health',{method:'GET',mode:'cors',cache:'no-store',signal:AbortSignal.timeout(6500)})
+  .then(async r=>{if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();if(!d||d.ok!==true)throw new Error('Health check failed');clearTimeout(timer);finish(true,'CONNECTED',d.database==='connected'?'Connected':'Unavailable');})
+  .catch(e=>{clearTimeout(timer);finish(false,e.name==='TimeoutError'?'TIMEOUT · API DID NOT RESPOND':'UNAVAILABLE · '+(e.message||'connection failed').slice(0,48),'Not verified');});
+})();
 </script>
 </body>
 </html>
