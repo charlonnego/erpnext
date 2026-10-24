@@ -278,7 +278,8 @@ drop policy if exists jd_audit_events_owner_insert on public.jd_audit_events;
 create policy jd_audit_events_owner_insert on public.jd_audit_events for insert to authenticated
   with check (actor_id = (select auth.uid()) and exists (select 1 from public.jd_businesses b where b.id = business_id and b.owner_id = (select auth.uid())));
 
-grant select, insert, update, delete on public.jd_businesses, public.jd_customers, public.jd_invoices, public.jd_invoice_lines, public.jd_receipts, public.jd_inventory_items, public.jd_stock_movements to authenticated;
+grant select, insert, update, delete on public.jd_businesses, public.jd_customers, public.jd_invoices, public.jd_invoice_lines, public.jd_receipts, public.jd_inventory_items to authenticated;
+grant select, insert on public.jd_stock_movements to authenticated;
 grant select, insert on public.jd_audit_events to authenticated;
 revoke all on public.jd_businesses, public.jd_customers, public.jd_invoices, public.jd_invoice_lines, public.jd_receipts, public.jd_inventory_items, public.jd_stock_movements, public.jd_audit_events from anon;
 
