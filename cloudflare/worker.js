@@ -315,6 +315,17 @@ export default {async fetch(req,env){
     if(["posted","approved","paid","completed","received","resolved","closed","converted"].includes(String(existing.status||"")))return json({error:"Posted or finalized records cannot be deleted. Use a reversal or status workflow."},409,origin);
     await env.DB.prepare("DELETE FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).run();await audit(env,bid,user.id,entity.replace("/","_")+".deleted",table,id);return json({id,deleted:true},200,origin);
    }
+   if(req.method==="GET"&&idPart&&action==="lines"&&entity!=="hr/payroll"){
+    const parent=await env.DB.prepare("SELECT id FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!parent)return json({error:"Parent record not found."},404,origin);let resultRows=[];
+    if(entity==="buying/requests")resultRows=(await env.DB.prepare("SELECT * FROM jd_material_request_lines WHERE request_id=? ORDER BY rowid").bind(id).all()).results||[];
+    else if(entity==="buying/orders")resultRows=(await env.DB.prepare("SELECT * FROM jd_ops_purchase_order_lines WHERE business_id=? AND purchase_order_id=? ORDER BY rowid").bind(bid,id).all()).results||[];
+    else if(entity==="buying/receipts")resultRows=(await env.DB.prepare("SELECT * FROM jd_ops_purchase_receipt_lines WHERE business_id=? AND receipt_id=? ORDER BY rowid").bind(bid,id).all()).results||[];
+    else if(entity==="selling/quotations")resultRows=(await env.DB.prepare("SELECT * FROM jd_quotation_lines WHERE quotation_id=? ORDER BY rowid").bind(id).all()).results||[];
+    else if(entity==="selling/orders")resultRows=(await env.DB.prepare("SELECT * FROM jd_ops_sales_order_lines WHERE business_id=? AND sales_order_id=? ORDER BY rowid").bind(bid,id).all()).results||[];
+    else if(entity==="manufacturing/boms")resultRows=(await env.DB.prepare("SELECT l.*,i.item_code,i.name AS component_name FROM jd_bom_lines l JOIN jd_items i ON i.id=l.component_item_id WHERE l.bom_id=? ORDER BY l.operation_sequence").bind(id).all()).results||[];
+    else return json({error:"Line items are not supported for this resource."},400,origin);
+    return json({lines:resultRows},200,origin);
+   }
    if(req.method==="GET"&&idPart&&action==="lines"&&entity==="hr/payroll"){const run=await env.DB.prepare("SELECT id FROM jd_payroll_runs WHERE id=? AND business_id=?").bind(id,bid).first();if(!run)return json({error:"Payroll run not found."},404,origin);const r=await env.DB.prepare("SELECT l.*,e.employee_number,e.first_name,e.last_name FROM jd_payroll_lines l JOIN jd_employees e ON e.id=l.employee_id WHERE l.payroll_run_id=? ORDER BY e.employee_number").bind(id).all();return json({lines:r.results||[]},200,origin);}
    if(req.method==="POST"&&idPart&&action){
     const current=await env.DB.prepare("SELECT * FROM "+table+" WHERE id=? AND business_id=?").bind(id,bid).first();if(!current)return json({error:"Record not found."},404,origin);
