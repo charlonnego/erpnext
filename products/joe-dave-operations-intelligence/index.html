@@ -449,5 +449,52 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
   .catch(e=>{clearTimeout(timer);finish(false,e.name==='TimeoutError'?'TIMEOUT · API DID NOT RESPOND':'UNAVAILABLE · '+(e.message||'connection failed').slice(0,48),'Not verified');});
 })();
 </script>
+
+<script>
+/* Standalone auth fallback: keeps sign-in and registration usable if the main app script fails. */
+(function(){
+ const API='https://joe-dave-operations-api.uchechukwuanuforo.workers.dev';
+ const $=id=>document.getElementById(id);
+ const replace=(id,fn)=>{const old=$(id);if(!old)return null;const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.addEventListener('click',fn);return fresh;};
+ const backdrop=$('auth-backdrop'), form=$('auth-form'), msg=$('auth-msg');
+ if(!backdrop||!form||!msg)return;
+ let mode='login';
+ const setMode=m=>{
+  mode=m;
+  const title=$('auth-title'),submit=$('auth-submit'),fields=$('register-fields');
+  if(title)title.textContent=m==='login'?'Sign in':'Create your workspace';
+  if(submit)submit.textContent=m==='login'?'Sign in':'Create account';
+  if(fields)fields.style.display=m==='login'?'none':'grid';
+  const name=form.elements.business_name;
+  if(name)name.required=m==='register';
+  const pass=form.elements.password;
+  if(pass){pass.minLength=m==='register'?12:0;pass.placeholder=m==='register'?'Password (minimum 12 characters)':'Password';pass.autocomplete=m==='login'?'current-password':'new-password';}
+  msg.hidden=true;
+ };
+ replace('auth-open',()=>{backdrop.style.display='flex';setMode('login');});
+ replace('auth-close',()=>{backdrop.style.display='none';});
+ replace('mode-login',()=>setMode('login'));
+ replace('mode-register',()=>setMode('register'));
+ backdrop.addEventListener('click',e=>{if(e.target===backdrop)backdrop.style.display='none';});
+ const freshForm=form.cloneNode(true);form.replaceWith(freshForm);
+ freshForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const data=new FormData(freshForm),body={email:String(data.get('email')||'').trim(),password:String(data.get('password')||'')};
+  if(mode==='register')Object.assign(body,{business_name:String(data.get('business_name')||'').trim(),display_name:String(data.get('display_name')||'').trim(),currency_code:String(data.get('currency_code')||'NGN')});
+  msg.hidden=false;msg.className='result';msg.textContent='Contacting the secure account service…';
+  const button=$('auth-submit');if(button)button.disabled=true;
+  try{
+   const response=await fetch(API+(mode==='login'?'/auth/login':'/auth/register'),{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+   let result={};try{result=await response.json();}catch{}
+   if(!response.ok)throw new Error(result.error||('Account request failed ('+response.status+').'));
+   if(!result.token)throw new Error('The server did not return a session token. Please contact support.');
+   sessionStorage.setItem('jd_session',result.token);
+   msg.className='result good';msg.textContent='Account authenticated. Loading your workspace…';
+   location.reload();
+  }catch(err){msg.className='result bad';msg.textContent=err.name==='TimeoutError'?'The server took too long to respond. Please try again.':(err.message||'Could not complete the account request.');}
+  finally{if(button)button.disabled=false;}
+ });
+})();
+</script>
 </body>
 </html>
