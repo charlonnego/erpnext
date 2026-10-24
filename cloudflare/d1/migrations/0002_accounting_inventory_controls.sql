@@ -19,3 +19,5 @@ CREATE TRIGGER IF NOT EXISTS jd_receipt_guard BEFORE INSERT ON jd_receipts WHEN 
 CREATE TRIGGER IF NOT EXISTS jd_journal_balance_guard BEFORE UPDATE OF status ON jd_journal_entries WHEN NEW.status='posted' AND ((SELECT COALESCE(SUM(debit_minor),0) FROM jd_journal_lines WHERE entry_id=NEW.id)<>(SELECT COALESCE(SUM(credit_minor),0) FROM jd_journal_lines WHERE entry_id=NEW.id) OR (SELECT COUNT(*) FROM jd_journal_lines WHERE entry_id=NEW.id)<2) BEGIN SELECT RAISE(ABORT,'journal entry must balance and contain at least two lines'); END;
 
 CREATE TABLE IF NOT EXISTS jd_purchase_order_counters (business_id TEXT PRIMARY KEY REFERENCES jd_businesses(id), next_number INTEGER NOT NULL DEFAULT 1 CHECK(next_number>0));
+
+CREATE TRIGGER IF NOT EXISTS jd_purchase_received_guard BEFORE UPDATE OF received_quantity ON jd_purchase_order_lines WHEN NEW.received_quantity<OLD.received_quantity OR NEW.received_quantity>NEW.quantity BEGIN SELECT RAISE(ABORT,'received quantity must be monotonic and cannot exceed ordered quantity'); END;
