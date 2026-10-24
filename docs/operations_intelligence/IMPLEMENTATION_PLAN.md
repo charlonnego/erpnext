@@ -77,3 +77,10 @@ This indicator is explicitly **not** a cash balance or cash-flow forecast: it ex
 ### Current practical scope
 
 Joe&dave is now an operational control layer for three concrete daily tasks: (1) follow up overdue customer and supplier invoices, (2) spot near-term invoice pressure and aged debt, and (3) review low-stock items against configured reorder levels. Users can open native invoice/payment forms and create a validated inventory draft. It does not yet provide verified bank reconciliation, payroll, order fulfilment, task/project SLAs, demand forecasting, or autonomous AI actions. Those should only be added against real ERPNext records and role-tested workflows.
+
+## Invoice follow-up task workflow
+
+The overdue invoice action centre now offers **Create follow-up** on each visible overdue invoice. Staff can enter an action and follow-up date; the server validates that the referenced document is a submitted Sales Invoice or Purchase Invoice with a positive outstanding balance, belongs to the user's default company, and is readable by the caller. It creates a native ERPNext ToDo linked to the invoice and assigned to the current user. It does not change the invoice or send messages.
+
+The feature adds tests for task linkage/ownership, unsupported document types, empty descriptions and cross-company protection. A lightweight GitHub Actions workflow checks Python module compilation and dashboard JavaScript syntax. These checks do not replace Frappe integration tests on a configured Bench/site; the PR remains unmerged until real-site tests and role/permission checks pass.
+
