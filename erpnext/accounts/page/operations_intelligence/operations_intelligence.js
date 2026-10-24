@@ -268,7 +268,7 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 				return;
 			}
 			data.items.forEach((item) => {
-				const $row = $("<button type='button' class='oi-action-row'>");
+				const $row = $("<div class='oi-action-row oi-action-row-interactive' role='button' tabindex='0'>");
 				const $main = $("<span class='oi-action-main'>");
 				$main.append($("<span class='oi-action-title'>").text(item.name || __("Invoice")));
 				$main.append($("<span class='oi-action-party text-muted'>").text(item.party || item.kind || ""));
@@ -279,8 +279,21 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 				$detail.append($("<span class='oi-action-due'>").text(`${item.days_overdue || 0} ${__("days overdue")}`));
 				$detail.append($("<span class='oi-action-due'>").text(`${__("Due")} ${item.due_date || __("Unknown")}`));
 				$detail.append($("<span class='oi-action-amount'>").text(format_currency(item.outstanding_amount || 0, data.currency)));
-				$row.append($main, $detail);
-				$row.on("click", () => frappe.set_route("Form", item.doctype, item.name));
+				const $followUp = $("<button type='button' class='btn btn-xs btn-default oi-follow-up'>").text(__("Create follow-up"));
+				$followUp.on("click", (event) => {
+					event.preventDefault();
+					event.stopPropagation();
+					create_invoice_follow_up(item);
+				});
+				$row.append($main, $detail, $followUp);
+				const openInvoice = () => frappe.set_route("Form", item.doctype, item.name);
+				$row.on("click", openInvoice);
+				$row.on("keydown", (event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						openInvoice();
+					}
+				});
 				$list.append($row);
 			});
 		}).catch(() => {
@@ -288,6 +301,47 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 		});
 	}
 
+
+
+	function create_invoice_follow_up(item) {
+		frappe.prompt([
+			{
+				fieldname: "description",
+				label: __("Follow-up action"),
+				fieldtype: "Small Text",
+				reqd: 1,
+				default: item.recommended_next_step || __("Review invoice and agree the next action"),
+			},
+			{
+				fieldname: "follow_up_date",
+				label: __("Follow-up date"),
+				fieldtype: "Date",
+				reqd: 1,
+				default: frappe.datetime.add_days(frappe.datetime.get_today(), 2),
+			},
+		], (values) => {
+			frappe.call({
+				method: "erpnext.operations_intelligence.workflows.create_invoice_follow_up",
+				args: {
+					doctype: item.doctype,
+					name: item.name,
+					description: values.description,
+					follow_up_date: values.follow_up_date,
+				},
+				freeze: true,
+				freeze_message: __("Creating follow-up task…"),
+			}).then((response) => {
+				if (!response.message) {
+					frappe.msgprint(__("The server did not return a task. Please refresh and try again."));
+					return;
+				}
+				frappe.show_alert({ message: response.message.message, indicator: "green" });
+				frappe.set_route("Form", "ToDo", response.message.name);
+			}).catch(() => {
+				frappe.msgprint(__("Could not create the follow-up task. Confirm your ToDo create permission and invoice access."));
+			});
+		}, __("Create invoice follow-up"), __("Create task"));
+	}
 
 	function load_low_stock_items() {
 		const $list = page.body.find(".oi-stock-list").empty();
@@ -447,6 +501,8 @@ frappe.pages["operations-intelligence"].on_page_load = function (wrapper) {
 			.operations-intelligence-page .oi-action-row:last-child { border-bottom:0; }
 			.operations-intelligence-page .oi-stock-row .oi-action-amount { color:var(--orange-600, var(--text-color)); }
 			.operations-intelligence-page .oi-action-row:hover { background:var(--subtle-fg); }
+			.operations-intelligence-page .oi-action-row-interactive { cursor:pointer; }
+			.operations-intelligence-page .oi-follow-up { flex:none; white-space:nowrap; }
 			.operations-intelligence-page .oi-action-main, .operations-intelligence-page .oi-action-detail { display:flex; flex-direction:column; gap:4px; min-width:0; }
 			.operations-intelligence-page .oi-action-title { font-weight:600; overflow-wrap:anywhere; }
 			.operations-intelligence-page .oi-action-party, .operations-intelligence-page .oi-action-due { font-size:12px; }
