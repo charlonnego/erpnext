@@ -34,3 +34,10 @@ test("invalid invoice receipt cannot be posted anonymously", async () => {
   });
   assert.equal(response.status, 401);
 });
+
+test("analytics and business branding remain private without a session", async () => {
+  for (const route of ["/analytics", "/business", "/receipts"]) {
+    const response = await fetch(base + route);
+    assert.equal(response.status, 401, route + " must require authentication");
+  }
+});
