@@ -37,18 +37,19 @@ export default {async fetch(req,env){
  if(origin&&!allowed.has(origin)&&!/^https:\/\/[a-z0-9-]+\.joe-dave-operations-intelligence\.pages\.dev$/.test(origin))return new Response("Origin not allowed",{status:403});
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:corsHeaders(origin)});
  if(req.method==="GET"&&path==="/health"){try{const r=await env.DB.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name LIKE 'jd_%'").first();return json({ok:true,service:"Joe&dave Operations Intelligence API",database:"connected",schema_tables:r?.n||0,at:new Date().toISOString()},200,origin);}catch{return json({ok:false,database:"unavailable"},503,origin);}}
+ let stage="request";
  try{
   if(path==="/auth/register"&&req.method==="POST"){
-   const b=await readJson(req);if(!b||!validText(b.email,254)||!/^\S+@\S+\.\S+$/.test(b.email)||typeof b.password!=="string"||b.password.length<12||b.password.length>200||!validText(b.business_name,160))return json({error:"Provide a valid email, business name and password of at least 12 characters."},400,origin);
+   stage="register.read";const b=await readJson(req);if(!b||!validText(b.email,254)||!/^\S+@\S+\.\S+$/.test(b.email)||typeof b.password!=="string"||b.password.length<12||b.password.length>200||!validText(b.business_name,160))return json({error:"Provide a valid email, business name and password of at least 12 characters."},400,origin);
    const email=b.email.trim().toLowerCase(),currency=String(b.currency_code||"NGN").toUpperCase();if(!currencies.includes(currency))return json({error:"Unsupported currency code."},400,origin);
-   const exists=await env.DB.prepare("SELECT id FROM jd_users WHERE email=?").bind(email).first();if(exists)return json({error:"An account with this email already exists."},409,origin);
-   const userId=uid(),businessId=uid(),token=hex(crypto.getRandomValues(new Uint8Array(32))),ph=await hashPassword(b.password),name=(b.display_name||b.business_name).trim().slice(0,160);
-   try{await env.DB.batch([
+   stage="register.lookup";const exists=await env.DB.prepare("SELECT id FROM jd_users WHERE email=?").bind(email).first();if(exists)return json({error:"An account with this email already exists."},409,origin);
+   stage="register.password_hash";const userId=uid(),businessId=uid(),token=hex(crypto.getRandomValues(new Uint8Array(32))),ph=await hashPassword(b.password),name=(b.display_name||b.business_name).trim().slice(0,160);
+   stage="register.persist";try{await env.DB.batch([
     env.DB.prepare("INSERT INTO jd_users(id,email,password_hash) VALUES(?,?,?)").bind(userId,email,ph.stored),
     env.DB.prepare("INSERT INTO jd_businesses(id,owner_id,legal_name,display_name,currency_code) VALUES(?,?,?,?,?)").bind(businessId,userId,b.business_name.trim(),name,currency),
     env.DB.prepare("INSERT INTO jd_sessions(token_hash,user_id,expires_at) VALUES(?,?,?)").bind(await digest(token),userId,new Date(Date.now()+7*86400000).toISOString()),
     env.DB.prepare("INSERT INTO jd_audit_events(id,business_id,actor_id,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?,?)").bind(uid(),businessId,userId,"account.created","business",businessId,"{}")
-   ]);}catch(e){return json({error:"Account could not be created. The email may already be registered."},409,origin);}
+   ]);}catch(e){console.error("jd_register_persist_failed",JSON.stringify({stage,name:e?.name||"Error",message:String(e?.message||"unknown").slice(0,180)}));return json({error:"Account could not be created. If this email is new, try again; otherwise sign in."},409,origin);}
    return json({token,user:{id:userId,email},business:{id:businessId,display_name:name,currency_code:currency}},201,origin);
   }
   if(path==="/auth/login"&&req.method==="POST"){
@@ -114,5 +115,5 @@ export default {async fetch(req,env){
   const bankMatchPrefix="/bank-transactions/";if(path.startsWith(bankMatchPrefix)&&path.endsWith("/reconcile")&&req.method==="POST"){const txnId=path.slice(bankMatchPrefix.length,-10),b=await readJson(req);if(!/^[a-f0-9-]{36}$/i.test(txnId)||!b||!validText(b.journal_entry_id,80))return json({error:"Transaction and journal entry IDs are required."},400,origin);const txn=await env.DB.prepare("SELECT id,amount_minor,reconciled FROM jd_bank_transactions WHERE id=? AND business_id=?").bind(txnId,bid).first();if(!txn)return json({error:"Bank transaction not found."},404,origin);if(txn.reconciled)return json({error:"Transaction is already reconciled."},409,origin);const match=await env.DB.prepare("SELECT e.id FROM jd_journal_entries e JOIN jd_journal_lines l ON l.entry_id=e.id WHERE e.id=? AND e.business_id=? AND e.status='posted' AND l.account_code IN ('1000','1010','1020','1090') AND (CASE WHEN ?>=0 THEN l.debit_minor ELSE l.credit_minor END)=ABS(?) LIMIT 1").bind(b.journal_entry_id,bid,Number(txn.amount_minor),Number(txn.amount_minor)).first();if(!match)return json({error:"No posted cash/bank journal line matches this transaction amount."},409,origin);await env.DB.prepare("UPDATE jd_bank_transactions SET reconciled=1,matched_journal_entry_id=? WHERE id=? AND business_id=? AND reconciled=0").bind(match.id,txnId,bid).run();await audit(env,bid,user.id,"bank_transaction.reconciled","bank_transaction",txnId,{journal_entry_id:match.id});return json({ok:true,matched_journal_entry_id:match.id},200,origin);}
 
   return json({error:"Endpoint not found."},404,origin);
- }catch(e){return json({error:"Request could not be completed. No internal details were exposed."},500,origin);}
+ }catch(e){const reference=uid();console.error("jd_api_request_failed",JSON.stringify({reference,path,method:req.method,stage,name:e?.name||"Error",message:String(e?.message||"unknown").slice(0,180)}));return json({error:path==="/auth/register"?"We could not finish creating your account. Please retry once; if it still fails, share reference "+reference+".":"Request could not be completed. No internal details were exposed.",reference},500,origin);}
 }};
