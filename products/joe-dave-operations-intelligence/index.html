@@ -54,7 +54,22 @@ document-preview{background:#fff}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
 
-/* Responsive command centre: phone, tablet, desktop and large TV displays */
+/* Bold, high-visibility command centre plus phone, tablet, desktop and TV layouts */
+.hero{
+ background:radial-gradient(ellipse at 88% 0%,rgba(202,255,173,.22),transparent 38%),linear-gradient(118deg,#102719 0%,#1d4c2d 56%,#286b3e 100%);
+ border:1px solid #2f7042;border-radius:20px;padding:clamp(18px,2.8vw,34px);
+ box-shadow:0 12px 28px rgba(18,55,28,.14);overflow:hidden
+}
+.hero h1{color:#fff}
+.hero h1 span{color:#d6ffad!important}
+.hero .eyebrow{color:#d6ffad}
+.hero p{color:#e0eee3}
+.hero .button{box-shadow:0 5px 14px rgba(0,0,0,.16)}
+.nav.active{font-weight:850;box-shadow:inset 4px 0 0 #236a3b}
+.card-head h2{font-weight:850}
+.metric b{font-weight:800}
+.button{font-weight:850;letter-spacing:.1px}
+
 .mobile-menu-toggle{display:none;align-items:center;justify-content:center;gap:8px;min-height:44px}
 .navwrap{min-width:0}
 .nav{min-height:42px}
