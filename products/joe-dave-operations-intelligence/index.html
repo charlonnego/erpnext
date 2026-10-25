@@ -172,7 +172,7 @@ img,canvas,svg,video{max-width:100%}
   <div class="side-note"><b>Independent product build</b>Independent Cloudflare application with a private D1 database and authenticated API.</div>
 </aside>
 <main class="main">
-  <div class="topbar"><div class="crumb">Joe&amp;dave <span style="color:#5b6c60">/</span> <span id="crumb">Overview</span></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill" id="api-status"><i class="dot"></i> API STATUS · CHECKING</span><button class="button secondary" id="auth-open">Sign in / Create account</button><button class="button secondary" id="auth-out" hidden>Sign out</button></div></div>
+  <div class="topbar"><div class="crumb">Joe&amp;dave <span style="color:#5b6c60">/</span> <span id="crumb">Overview</span></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill" id="api-status"><i class="dot"></i> API STATUS · CHECKING</span><button class="button secondary" id="auth-open">Sign in / Create account</button><button class="button" id="jd-install-app" type="button" aria-describedby="jd-install-help">↓ Install app</button><button class="button secondary" id="auth-out" hidden>Sign out</button></div></div><p id="jd-install-help" hidden style="margin:-20px 0 22px auto;max-width:440px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);font-size:13px">To install Joe&amp;dave, open your browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. Installation availability depends on your browser.</p>
 
   <section class="section active" id="page-overview">
     <div class="hero"><div><div class="eyebrow">Business command centre</div><h1>Run the business.<br><span style="color:var(--green)">See what needs action.</span></h1><p>A standalone business operations engine. Manage customers, issue invoices, record receipts and import inventory using your own records—not invented figures.</p></div><button class="button" data-go="inventory">Validate an inventory file ↗</button></div>
@@ -492,20 +492,46 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
   try{const doc=docText(await fetchDoc(kind),kind);$('document-preview').hidden=false;$('document-preview').innerHTML=doc.html;$('document-msg').hidden=true;
    if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script>
 
+
 <script id="jd-pwa-install">
-(()=>{
- let installEvent=null;
- const addInstallButton=()=>{
-  if(document.getElementById('jd-install-app'))return;
-  const btn=document.createElement('button');btn.id='jd-install-app';btn.type='button';btn.textContent='Install app';
-  Object.assign(btn.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:'9999',padding:'12px 16px',border:'1px solid #1d5730',borderRadius:'12px',background:'#1d5730',color:'#fff',font:'700 14px system-ui,sans-serif',boxShadow:'0 8px 24px rgba(0,0,0,.18)',cursor:'pointer'});
-  btn.addEventListener('click',async()=>{if(!installEvent){btn.textContent='Use browser menu → Add to Home Screen';return;}installEvent.prompt();await installEvent.userChoice;installEvent=null;btn.remove();});
-  document.body.appendChild(btn);
- };
- window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installEvent=event;addInstallButton();});
- window.addEventListener('appinstalled',()=>{const btn=document.getElementById('jd-install-app');if(btn)btn.remove();});
+(() => {
+  const button = document.getElementById('jd-install-app');
+  const help = document.getElementById('jd-install-help');
+  if (!button) return;
+  let installPrompt = null;
+  const standalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const hideIfInstalled = () => {
+    if (standalone()) {
+      button.hidden = true;
+      if (help) help.hidden = true;
+    }
+  };
+  hideIfInstalled();
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    button.textContent = '↓ Install Joe&dave';
+    button.hidden = standalone();
+  });
+  button.addEventListener('click', async () => {
+    if (!installPrompt) {
+      if (help) help.hidden = !help.hidden;
+      return;
+    }
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    if (choice && choice.outcome === 'accepted') button.textContent = 'Installing…';
+    else button.textContent = '↓ Install app';
+  });
+  window.addEventListener('appinstalled', () => {
+    button.hidden = true;
+    if (help) help.hidden = true;
+    installPrompt = null;
+  });
 })();
 </script>
+
 </body></html>');win.document.close();return;}
    const b=doc.business;const lines=kind==='receipt'?['Payment received for '+doc.invoice.invoice_number,'Amount received: '+money(doc.receipt.amount_minor,b.currency_code),'Method: '+doc.receipt.payment_method,'Date: '+String(doc.receipt.received_at||'').slice(0,10)]:[...(doc.lines||[]).map(l=>l.description+' | '+Number(l.quantity)+' x '+money(l.unit_price_minor,b.currency_code)+' = '+money(l.line_subtotal_minor,b.currency_code)),'Subtotal: '+money(doc.invoice.subtotal_minor,b.currency_code),'Tax: '+money(doc.invoice.tax_minor,b.currency_code),'Total: '+money(doc.invoice.total_minor,b.currency_code),'Paid: '+money(doc.invoice.paid_minor,b.currency_code),'Balance due: '+money(Math.max(0,doc.invoice.total_minor-doc.invoice.paid_minor),b.currency_code)];
    const escXml=xmlEsc,accent=(kind==='receipt'?b.receipt_template:b.invoice_template)==='minimal'?'#202820':(b.brand_color||'#245b3a');let y=300,svg='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600"><rect width="1200" height="1600" fill="#fff"/><rect width="1200" height="18" fill="'+escXml(accent)+'"/>';
