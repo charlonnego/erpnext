@@ -34,7 +34,7 @@ const groups={'ops-inventory':['inventory/items','inventory/warehouses','invento
 const esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 function getToken(){return sessionStorage.getItem('jd_session')||''}
 const LOCAL_MODE_KEY='jd_ops_local_mode_v1', LOCAL_DATA_KEY='jd_ops_local_data_v1';
-function localMode(){return localStorage.getItem(LOCAL_MODE_KEY)!=='live'}
+function localMode(){return localStorage.getItem(LOCAL_MODE_KEY)==='local'}
 function setLocalMode(on){localStorage.setItem(LOCAL_MODE_KEY,on?'local':'live');updateModeUi()}
 function localDb(){try{return JSON.parse(localStorage.getItem(LOCAL_DATA_KEY)||'{}')}catch{return {}}}
 function saveLocalDb(db){localStorage.setItem(LOCAL_DATA_KEY,JSON.stringify(db))}
