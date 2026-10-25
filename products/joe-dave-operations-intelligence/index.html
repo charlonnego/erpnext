@@ -151,6 +151,11 @@ img,canvas,svg,video{max-width:100%}
 }
 
 </style>
+<meta name="description" content="Joe&dave brings finance, invoicing, inventory, purchasing, HR and business operations into one workspace.">
+<meta name="application-name" content="Joe&dave">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.svg">
 </head>
 <body>
 <div class="shell">
@@ -486,6 +491,21 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
   const win=format==='pdf'?window.open('about:blank','_blank'):null;
   try{const doc=docText(await fetchDoc(kind),kind);$('document-preview').hidden=false;$('document-preview').innerHTML=doc.html;$('document-msg').hidden=true;
    if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script>
+
+<script id="jd-pwa-install">
+(()=>{
+ let installEvent=null;
+ const addInstallButton=()=>{
+  if(document.getElementById('jd-install-app'))return;
+  const btn=document.createElement('button');btn.id='jd-install-app';btn.type='button';btn.textContent='Install app';
+  Object.assign(btn.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:'9999',padding:'12px 16px',border:'1px solid #1d5730',borderRadius:'12px',background:'#1d5730',color:'#fff',font:'700 14px system-ui,sans-serif',boxShadow:'0 8px 24px rgba(0,0,0,.18)',cursor:'pointer'});
+  btn.addEventListener('click',async()=>{if(!installEvent){btn.textContent='Use browser menu → Add to Home Screen';return;}installEvent.prompt();await installEvent.userChoice;installEvent=null;btn.remove();});
+  document.body.appendChild(btn);
+ };
+ window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installEvent=event;addInstallButton();});
+ window.addEventListener('appinstalled',()=>{const btn=document.getElementById('jd-install-app');if(btn)btn.remove();});
+})();
+</script>
 </body></html>');win.document.close();return;}
    const b=doc.business;const lines=kind==='receipt'?['Payment received for '+doc.invoice.invoice_number,'Amount received: '+money(doc.receipt.amount_minor,b.currency_code),'Method: '+doc.receipt.payment_method,'Date: '+String(doc.receipt.received_at||'').slice(0,10)]:[...(doc.lines||[]).map(l=>l.description+' | '+Number(l.quantity)+' x '+money(l.unit_price_minor,b.currency_code)+' = '+money(l.line_subtotal_minor,b.currency_code)),'Subtotal: '+money(doc.invoice.subtotal_minor,b.currency_code),'Tax: '+money(doc.invoice.tax_minor,b.currency_code),'Total: '+money(doc.invoice.total_minor,b.currency_code),'Paid: '+money(doc.invoice.paid_minor,b.currency_code),'Balance due: '+money(Math.max(0,doc.invoice.total_minor-doc.invoice.paid_minor),b.currency_code)];
    const escXml=xmlEsc,accent=(kind==='receipt'?b.receipt_template:b.invoice_template)==='minimal'?'#202820':(b.brand_color||'#245b3a');let y=300,svg='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600"><rect width="1200" height="1600" fill="#fff"/><rect width="1200" height="18" fill="'+escXml(accent)+'"/>';
