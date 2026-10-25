@@ -493,44 +493,6 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
    if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script>
 
 
-<script id="jd-pwa-install">
-(() => {
-  const button = document.getElementById('jd-install-app');
-  const help = document.getElementById('jd-install-help');
-  if (!button) return;
-  let installPrompt = null;
-  const standalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  const hideIfInstalled = () => {
-    if (standalone()) {
-      button.hidden = true;
-      if (help) help.hidden = true;
-    }
-  };
-  hideIfInstalled();
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    installPrompt = event;
-    button.textContent = '↓ Install Joe&dave';
-    button.hidden = standalone();
-  });
-  button.addEventListener('click', async () => {
-    if (!installPrompt) {
-      if (help) help.hidden = !help.hidden;
-      return;
-    }
-    installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    installPrompt = null;
-    if (choice && choice.outcome === 'accepted') button.textContent = 'Installing…';
-    else button.textContent = '↓ Install app';
-  });
-  window.addEventListener('appinstalled', () => {
-    button.hidden = true;
-    if (help) help.hidden = true;
-    installPrompt = null;
-  });
-})();
-</script>
 
 </body></html>');win.document.close();return;}
    const b=doc.business;const lines=kind==='receipt'?['Payment received for '+doc.invoice.invoice_number,'Amount received: '+money(doc.receipt.amount_minor,b.currency_code),'Method: '+doc.receipt.payment_method,'Date: '+String(doc.receipt.received_at||'').slice(0,10)]:[...(doc.lines||[]).map(l=>l.description+' | '+Number(l.quantity)+' x '+money(l.unit_price_minor,b.currency_code)+' = '+money(l.line_subtotal_minor,b.currency_code)),'Subtotal: '+money(doc.invoice.subtotal_minor,b.currency_code),'Tax: '+money(doc.invoice.tax_minor,b.currency_code),'Total: '+money(doc.invoice.total_minor,b.currency_code),'Paid: '+money(doc.invoice.paid_minor,b.currency_code),'Balance due: '+money(Math.max(0,doc.invoice.total_minor-doc.invoice.paid_minor),b.currency_code)];
@@ -660,5 +622,45 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
   });
 })();
 </script>
+
+<script id="jd-pwa-install">
+(() => {
+  const button = document.getElementById('jd-install-app');
+  const help = document.getElementById('jd-install-help');
+  if (!button) return;
+  let installPrompt = null;
+  const standalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const hideIfInstalled = () => {
+    if (standalone()) {
+      button.hidden = true;
+      if (help) help.hidden = true;
+    }
+  };
+  hideIfInstalled();
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    button.textContent = '↓ Install Joe&dave';
+    button.hidden = standalone();
+  });
+  button.addEventListener('click', async () => {
+    if (!installPrompt) {
+      if (help) help.hidden = !help.hidden;
+      return;
+    }
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    if (choice && choice.outcome === 'accepted') button.textContent = 'Installing…';
+    else button.textContent = '↓ Install app';
+  });
+  window.addEventListener('appinstalled', () => {
+    button.hidden = true;
+    if (help) help.hidden = true;
+    installPrompt = null;
+  });
+})();
+</script>
+
 </body>
 </html>
