@@ -1,0 +1,14 @@
+name = "joe-dave-operations-api"
+main = "worker.js"
+compatibility_date = "2026-10-24"
+account_id = "aa960425a186e78adce72854b09c88fe"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "joe-dave-operations"
+database_id = "239128a2-a17e-4542-83b4-d119598be5fa"
+migrations_dir = "d1/migrations"

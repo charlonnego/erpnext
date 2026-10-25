@@ -1,0 +1,86 @@
+# Joe&dave Operations Intelligence — implementation plan
+
+## Product goal
+
+Add a practical, permission-aware operations intelligence layer to the Joe&dave product, built on this modified ERPNext codebase, for service businesses. The underlying ERPNext records remain the system of record; this feature summarizes existing transactions and helps owners decide what to do next. Keep upstream attribution and license notices intact; see [Joe&dave branding and open-source compliance](../JOE_AND_DAVE_COMPLIANCE.md).
+
+## First vertical slice: owner overview
+
+Deliver a server-side KPI endpoint for the active user's default company:
+- Submitted sales value for a selected date range.
+- Submitted purchase value for the same date range.
+- Outstanding customer receivables and count of overdue sales invoices.
+- Outstanding supplier payables.
+- A clear date range and company in the response.
+
+The insight engine uses deterministic calculations, existing ERPNext documents, and Frappe's permission-aware APIs. Insight endpoints do not invent data or post accounting entries. Separate transaction workflows open standard ERPNext forms for draft invoices and payment entries, while inventory imports create draft stock reconciliations for explicit review; none are submitted automatically.
+
+## Next increments
+
+1. Action centre: **initial slice implemented** for overdue submitted sales and purchase invoices. It lists up to 10 permission-visible items, ordered by due date, and opens the source invoice. Low-stock items, delayed projects/tasks and pending approvals remain future work.
+2. Inventory signals: **initial low-stock slice implemented** using warehouse-specific Item reorder levels and visible Bin actual quantities. Slow-moving stock and deeper stock-ledger analysis remain future work; verify against warehouse permissions and stock UOMs in a live site.
+3. Live rules engine: `erpnext.operations_intelligence.engine.get_engine_snapshot` composes the KPI, overdue-invoice and low-stock services into deterministic, explainable alerts. It returns `mode=live_read_only`, source context, as-of date and an explicit no-writes flag. The rules only report findings from returned ERPNext records; they do not create example numbers or silently perform actions.
+4. Service profitability: project/service revenue and cost where source data supports it; label estimates and missing costs.
+5. Trends and anomaly rules: compare consistent periods, explain each rule, and avoid false precision.
+6. AI business adviser: optional natural-language explanations grounded only in permission-filtered metrics; no autonomous posting, payment, refunds or stock adjustments.
+7. Mobile and offline: responsive web first; then a dedicated Android/PWA workflow for offline capture with idempotency keys, retry-safe sync, and explicit conflict resolution.
+8. Transaction entry: **initial UI slice implemented** with native ERPNext Sales Invoice, Purchase Invoice, Payment Entry (customer receipt and supplier payment) forms. These use standard ERPNext validation and permission checks; users review, save and submit through the native form rather than an unverified custom accounting API.
+9. Inventory harmonization: **CSV preview/validation and draft Stock Reconciliation implemented**. CSV columns: `item_code`, `warehouse`, `qty`, optional `valuation_rate`; one row per item/warehouse; maximum 2,000 rows and 5 MB per file. The server checks the user's default company, leaf warehouses, enabled stock items, duplicates, numeric quantities and create permission. It creates an unsubmitted Stock Reconciliation only after validation; users must review and submit it themselves. Serial/batch-tracked items are rejected by this first CSV workflow; import those through native ERPNext stock tools until dedicated serial/batch mapping is implemented. Real-site validation remains outstanding.
+
+## Engineering guardrails
+
+- Do not modify upstream accounting semantics or silently change ERPNext core workflows.
+- Read through Frappe permission-aware APIs; never expose another user's/company's records.
+- Use submitted documents (docstatus = 1) for financial KPIs and state the metric definitions.
+- Validate date ranges and require a default company.
+- No fabricated demo values in production responses.
+- Add automated tests for date validation, no-company behavior, aggregation, permissions, and empty datasets.
+- Keep this feature isolated so it can later become a separate Frappe app if that is safer for upgrades.
+
+## Acceptance criteria for the first slice
+
+- Endpoint returns stable JSON with company, from/to dates and named metrics.
+- Draft/cancelled invoices are excluded.
+- The result is limited to the active user's default company and permissions.
+- Invalid or reversed date ranges fail with a useful validation message.
+- Empty accounts return zero values rather than errors.
+- No writes are performed.
+
+
+## Deployment boundary
+
+The Cloudflare Pages URL is static hosting only. It cannot execute the Frappe Python methods or connect securely to an ERPNext database by itself. The live engine runs inside an authenticated Frappe/ERPNext site; Pages now shows no KPIs or sample records and explicitly states that a site connection is required. A real site deployment and authenticated integration must be completed before users can see live results.
+
+## Current verification status
+
+The backend and dashboard changes are committed to the feature branch, and CI syntax checks are configured. Frappe integration tests have been authored but have **not** been run against a real Bench/site in this environment. Do not describe the engine as production-ready until the test suite passes on the target Frappe version and company/role permissions, Bin schema and reorder-level behavior are verified with real records.
+
+
+## Transaction and inventory safeguards
+
+- Invoice and receipt buttons open standard ERPNext forms: Sales Invoice, Purchase Invoice and Payment Entry for Receive/Pay. No invoice is submitted and no money movement is triggered automatically.
+- Inventory CSV rows represent counted on-hand quantities, not quantity deltas. Import produces a draft Stock Reconciliation and does not post stock-ledger or general-ledger entries until an authorized user submits it.
+- Import errors block draft creation. The server repeats validation when creating the draft, limits each batch to 2,000 rows, rejects duplicate item/warehouse combinations and restricts warehouses to the default company.
+- The first CSV format is for standard stock items. Before production, test serial/batch-tracked items, inventory dimensions, valuation rates, opening-stock scenarios, permission combinations and a rollback/reversal workflow on the target ERPNext version.
+
+
+## Business-smart action prioritization (first rules-based increment)
+
+The overdue action centre now orders visible overdue invoices by days overdue and then outstanding balance, and provides a suggested next step for receivables versus payables. Balances are expressed in the company's base currency. The recommendation is a transparent rule, not an AI prediction; it never sends messages or schedules payments. Staff must verify the record and follow the business's approval process. Future business profiles can configure escalation windows and policies rather than hard-coding one rule for every industry.
+
+## Working capital watch (new rules-based increment)
+
+The dashboard now displays permission-aware aging buckets for open submitted Sales Invoices and Purchase Invoices: 1–30, 31–60, 61–90 and over 90 days overdue, plus invoices due today through day 7 and days 8–30. It shows open receivables/payables and a scheduled net-due indicator (customer invoices due in the next 30 days minus supplier invoices due in that window). The engine raises an alert when scheduled supplier obligations exceed customer invoices due, and when balances have aged beyond 90 days.
+
+This indicator is explicitly **not** a cash balance or cash-flow forecast: it excludes bank balances, payment probability, payroll, taxes, purchase orders, credit facilities and other cash movements. It is a prompt to review actual bank position, collection plans and supplier terms—not a payment instruction. The summary uses submitted invoices, positive outstanding balances, company base currency and permission-aware Frappe lists.
+
+### Current practical scope
+
+Joe&dave is now an operational control layer for three concrete daily tasks: (1) follow up overdue customer and supplier invoices, (2) spot near-term invoice pressure and aged debt, and (3) review low-stock items against configured reorder levels. Users can open native invoice/payment forms and create a validated inventory draft. It does not yet provide verified bank reconciliation, payroll, order fulfilment, task/project SLAs, demand forecasting, or autonomous AI actions. Those should only be added against real ERPNext records and role-tested workflows.
+
+## Invoice follow-up task workflow
+
+The overdue invoice action centre now offers **Create follow-up** on each visible overdue invoice. Staff can enter an action and follow-up date; the server validates that the referenced document is a submitted Sales Invoice or Purchase Invoice with a positive outstanding balance, belongs to the user's default company, and is readable by the caller. It creates a native ERPNext ToDo linked to the invoice and assigned to the current user. It does not change the invoice or send messages.
+
+The feature adds tests for task linkage/ownership, unsupported document types, empty descriptions and cross-company protection. A lightweight GitHub Actions workflow checks Python module compilation and dashboard JavaScript syntax. These checks do not replace Frappe integration tests on a configured Bench/site; the PR remains unmerged until real-site tests and role/permission checks pass.
+

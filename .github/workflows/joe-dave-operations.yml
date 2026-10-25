@@ -1,0 +1,38 @@
+name: Joe & Dave operational modules checks
+on:
+  push:
+    branches:
+      - custom/operations-intelligence
+    paths:
+      - "cloudflare/worker.js"
+      - "cloudflare/d1/migrations/**"
+      - "cloudflare/tests/**"
+      - "products/joe-dave-operations-intelligence/**"
+      - ".github/workflows/joe-dave-operations.yml"
+  pull_request:
+    paths:
+      - "cloudflare/worker.js"
+      - "products/joe-dave-operations-intelligence/**"
+      - ".github/workflows/joe-dave-operations.yml"
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check API Worker syntax
+        run: node --check cloudflare/worker.js
+      - name: Check operational UI syntax
+        run: node --check products/joe-dave-operations-intelligence/operations-modules.js
+      - name: Run source regression tests
+        run: node --test cloudflare/tests/joe-dave-source-regression.test.mjs
+      - name: Check operational schema migrations exist
+        run: |
+          test -s products/joe-dave-operations-intelligence/migrations/0002_extended_operations.sql
+          test -s products/joe-dave-operations-intelligence/migrations/0003_operational_compatibility.sql
+          test -s products/joe-dave-operations-intelligence/migrations/0004_sales_manufacturing.sql
+          test -s products/joe-dave-operations-intelligence/migrations/0005_manufacturing_costing.sql
