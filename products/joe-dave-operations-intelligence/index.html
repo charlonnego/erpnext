@@ -53,14 +53,97 @@ document-preview{background:#fff}
 @media(max-width:900px){.sidebar{background:#fff}.navwrap{padding-bottom:4px}.nav{flex:none}.main{padding:18px 14px 36px}.topbar{align-items:flex-start;flex-direction:column}.topbar>div:last-child{width:100%}.topbar button{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
+
+/* Responsive command centre: phone, tablet, desktop and large TV displays */
+.mobile-menu-toggle{display:none;align-items:center;justify-content:center;gap:8px;min-height:44px}
+.navwrap{min-width:0}
+.nav{min-height:42px}
+.button{min-height:44px}
+.card{overflow-wrap:anywhere}
+img,canvas,svg,video{max-width:100%}
+.table-wrap,.table-scroll{max-width:100%;overflow-x:auto}
+:focus-visible{outline:3px solid #176c35;outline-offset:3px}
+@media(max-width:900px){
+ .sidebar{position:sticky;top:0;z-index:20;box-shadow:0 6px 18px rgba(16,40,22,.08)}
+ .brand{padding:4px 6px 10px}
+ .mobile-menu-toggle{display:flex;width:100%;margin:0 0 8px}
+ .navwrap{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:62vh;overflow:auto;padding:4px 0 8px}
+ .navwrap.is-open{display:grid}
+ .nav{white-space:normal;width:100%;min-width:0;margin:0;justify-content:flex-start;overflow-wrap:anywhere}
+ .main{width:100%;padding:18px 16px 34px}
+ .topbar{align-items:flex-start;flex-direction:column;gap:12px}
+ .topbar>div:last-child{width:100%;display:flex;flex-wrap:wrap}
+ .topbar button{white-space:normal}
+ .hero{align-items:stretch;flex-direction:column}
+ .hero>.button{white-space:normal;width:100%}
+ .span-8,.span-6,.span-4{grid-column:span 12}
+}
+@media(max-width:480px){
+ body{font-size:16px}
+ .brand{gap:10px}
+ .brand strong{font-size:17px}
+ .brand small{font-size:10px}
+ .main{padding:14px 11px 28px}
+ h1{font-size:clamp(27px,8vw,36px);letter-spacing:-.8px}
+ h2{font-size:16px}
+ .grid{gap:10px}
+ .card{padding:14px;border-radius:13px}
+ .card-head{align-items:flex-start;flex-wrap:wrap}
+ .card-head>*{max-width:100%}
+ .metric{align-items:flex-start;flex-direction:column;gap:4px}
+ .metric span{text-align:left;overflow-wrap:anywhere}
+ .analysis-row{align-items:flex-start;flex-direction:column}
+ .analysis-row span{text-align:left}
+ .document-preview{padding:12px;overflow-wrap:anywhere}
+ .template-choice label{max-width:100%;flex-wrap:wrap}
+ .result{font-size:14px}
+ input,select,textarea{width:100%;min-width:0}
+ input[type="file"]{font-size:13px}
+ .button{white-space:normal;max-width:100%}
+}
+@media(min-width:901px) and (max-width:1200px){
+ .shell{grid-template-columns:220px minmax(0,1fr)}
+ .sidebar{padding:18px 12px}
+ .main{padding:22px 20px 38px}
+ .card{padding:15px}
+}
+@media(min-width:1600px){
+ body{font-size:17px}
+ .shell{grid-template-columns:300px minmax(0,1fr)}
+ .sidebar{padding:30px 20px}
+ .brand strong{font-size:20px}
+ .nav{padding:13px 14px;font-size:16px}
+ .main{padding:38px clamp(32px,3vw,72px) 64px;max-width:2600px;width:100%;margin-inline:auto}
+ h1{font-size:clamp(42px,2.4vw,64px)}
+ h2{font-size:20px}
+ .grid{gap:20px}
+ .card{padding:24px;border-radius:20px}
+ .button{padding:14px 20px;font-size:16px}
+ .metric{padding:17px 0}
+ .metric b{font-size:15px}
+ .metric span{font-size:14px}
+ .navwrap{max-height:calc(100vh - 190px);overflow-y:auto}
+}
+@media(min-width:2200px){
+ body{font-size:19px}
+ .main{padding-top:48px}
+ .grid{gap:24px}
+ .card{padding:30px}
+ .nav{font-size:18px;padding:15px}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
+}
+
 </style>
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
   <div class="brand"><div class="mark">J&amp;D</div><div><strong>Joe&amp;dave</strong><small>Operations Intelligence</small></div></div>
+  <button class="button secondary mobile-menu-toggle" id="nav-toggle" type="button" aria-controls="navwrap" aria-expanded="false">☰ All modules</button>
   <div class="navlabel">Workspace</div>
-  <div class="navwrap">
+  <div class="navwrap" id="navwrap" aria-label="Main navigation">
     <button class="nav active" data-page="overview"><span>⌂</span>Overview</button>
     <button class="nav" data-page="finance"><span>↗</span>Finance</button>
     <button class="nav" data-page="inventory"><span>▦</span>Inventory import</button>
@@ -387,7 +470,26 @@ document.getElementById('csvfile').addEventListener('change',async e=>{const fil
  async function exportDocument(kind,format){
   const win=format==='pdf'?window.open('about:blank','_blank'):null;
   try{const doc=docText(await fetchDoc(kind),kind);$('document-preview').hidden=false;$('document-preview').innerHTML=doc.html;$('document-msg').hidden=true;
-   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script></body></html>');win.document.close();return;}
+   if(format==='pdf'){if(!win)throw new Error('Allow pop-ups to print or save a PDF.');win.document.open();win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(doc.title)+' '+esc(doc.number)+'</title><style>'+docCss()+'</style></head><body>'+doc.html+'<script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script>
+<script>
+(() => {
+  const toggle = document.getElementById('nav-toggle');
+  const nav = document.getElementById('navwrap');
+  if (!toggle || !nav) return;
+  toggle.addEventListener('click', () => {
+    const open = nav.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = open ? '✕ Close modules' : '☰ All modules';
+  });
+  nav.addEventListener('click', event => {
+    if (!event.target.closest('.nav')) return;
+    nav.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '☰ All modules';
+  });
+})();
+</script>
+</body></html>');win.document.close();return;}
    const b=doc.business;const lines=kind==='receipt'?['Payment received for '+doc.invoice.invoice_number,'Amount received: '+money(doc.receipt.amount_minor,b.currency_code),'Method: '+doc.receipt.payment_method,'Date: '+String(doc.receipt.received_at||'').slice(0,10)]:[...(doc.lines||[]).map(l=>l.description+' | '+Number(l.quantity)+' x '+money(l.unit_price_minor,b.currency_code)+' = '+money(l.line_subtotal_minor,b.currency_code)),'Subtotal: '+money(doc.invoice.subtotal_minor,b.currency_code),'Tax: '+money(doc.invoice.tax_minor,b.currency_code),'Total: '+money(doc.invoice.total_minor,b.currency_code),'Paid: '+money(doc.invoice.paid_minor,b.currency_code),'Balance due: '+money(Math.max(0,doc.invoice.total_minor-doc.invoice.paid_minor),b.currency_code)];
    const escXml=xmlEsc,accent=(kind==='receipt'?b.receipt_template:b.invoice_template)==='minimal'?'#202820':(b.brand_color||'#245b3a');let y=300,svg='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600"><rect width="1200" height="1600" fill="#fff"/><rect width="1200" height="18" fill="'+escXml(accent)+'"/>';
    if(b.logo_data_url)svg+='<image href="'+escXml(b.logo_data_url)+'" x="70" y="65" width="170" height="100" preserveAspectRatio="xMidYMid meet"/>';
