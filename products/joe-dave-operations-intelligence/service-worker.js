@@ -1,5 +1,5 @@
-const CACHE_NAME = "joe-dave-shell-v1";
-const SHELL_URLS = ["/"];
+const CACHE_NAME = "joe-dave-shell-v2";
+const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon-192.svg", "/icon-512.svg"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_URLS)).then(() => self.skipWaiting()));
 });
