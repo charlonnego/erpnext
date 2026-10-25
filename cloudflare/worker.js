@@ -25,7 +25,7 @@ function allowedForRole(role,path,method){
  if(role==="owner"||role==="admin")return true;
  if(path.startsWith("/ops/")){
   const p=path.split("/").slice(2),group=p[0]||"",sub=p[1]||"";
-  if(group==="hr")return role==="hr";
+  if(group==="hr")return sub==="claims"?["hr","accountant"].includes(role):role==="hr";
   if(group==="inventory"||group==="manufacturing")return role==="inventory";
   if(group==="crm"||group==="selling"||group==="support")return role==="sales";
   if(group==="buying")return ["accountant","inventory"].includes(role);
